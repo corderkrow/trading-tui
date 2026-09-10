@@ -7,18 +7,18 @@ with async-first design patterns for zero-latency data streams.
 
 ## Features
 
-- **Market data REST API** — candles and quotes via pluggable exchange
+- **Market data REST API**: candles and quotes via pluggable exchange
   adapters (`yahoo` default, no API key; `binance`). Yahoo also powers
   predefined screeners and a custom screener over the full US universe.
-- **Price alerts** — one or more conditions (Above / Below / Crossing), AND/OR
+- **Price alerts**: one or more conditions (Above / Below / Crossing), AND/OR
   combination, once-only or every-time triggering, expiration, custom messages,
   and notification channels.
-- **Alert evaluation** — `AlertService` reacts to price updates (observer-style
+- **Alert evaluation**: `AlertService` reacts to price updates (observer-style
   `handle_price`) without coupling market data to alerts.
-- **Notification channels** — extensible channel abstraction (`in_app` is
+- **Notification channels**: extensible channel abstraction (`in_app` is
   implemented; `toast`/`sound`/`push`/`email` are registered no-op
   placeholders). A global delivery preference filters which channels may fire.
-- **Textual TUI** — keyboard-first console opening on a **live market screener**:
+- **Textual TUI**: keyboard-first console opening on a **live market screener**:
   - Predefined Yahoo lists (`t` top most-active · `g` gainers · `l` losers).
   - **Multiple watchlists** (`w`; `tab` cycles, `n` creates).
   - **Custom screener** (`s`) over the full universe (~20k US stocks) with
@@ -30,17 +30,17 @@ with async-first design patterns for zero-latency data streams.
     enable/disable/delete.
   - Settings modal (`o`): watchlist mode, lists, price-change sources,
     thresholds and delivery.
-- **Background price monitor** — TUI worker polls quotes every 60s and fires a
+- **Background price monitor**: TUI worker polls quotes every 60s and fires a
   toast when a symbol crosses an enabled % change threshold (re-arms only after
   falling back below it).
-- **Currency formatting** — 16 currencies (`CURRENCY` env, default `usd`) with
+- **Currency formatting**: 16 currencies (`CURRENCY` env, default `usd`) with
   locale-aware symbols/separators across all price columns.
-- **SQLite persistence** — alerts survive restarts (`SqliteAlertRepository` via
+- **SQLite persistence**: alerts survive restarts (`SqliteAlertRepository` via
   `aiosqlite`, WAL mode; path from `ALERTS_DB_PATH`, default project root
   `alerts.db`).
-- **User settings** — watchlists + notification prefs persisted atomically to
+- **User settings**: watchlists + notification prefs persisted atomically to
   `~/.config/trading-tui/settings.json` (override with `TRADING_TUI_SETTINGS`).
-- **Packaging & deploy** — `trading-tui` / `trading-tui-api` console scripts,
+- **Packaging & deploy**: `trading-tui` / `trading-tui-api` console scripts,
   `install.sh` one-liner installer, Dockerfile + `docker-compose.yml`.
 
 ## Quick start
@@ -55,7 +55,7 @@ ADAPTER_NAME=yahoo
 DEFAULT_SYMBOL=BTC-USD
 EOF
 
-# Run API server (alerts persist to project-root alerts.db — override with ALERTS_DB_PATH)
+# Run API server (alerts persist to project-root alerts.db: override with ALERTS_DB_PATH)
 uvicorn app.main:app --reload --port 8333
 
 # Run the TUI (alerts console)
@@ -151,7 +151,7 @@ Create example:
 ```
 
 - **Operators:** `above`, `below`, `crossing` (crossing detects a transition
-  through the target using the previous price — equality alone is not a cross).
+  through the target using the previous price: equality alone is not a cross).
 - **match_mode:** `ALL` (AND) or `ANY` (OR).
 - **trigger_mode:** `ONCE` (fires once → `TRIGGERED`) or `EVERY_TIME`.
 - **expires_at:** required to be timezone-aware and in the future; expired
@@ -168,11 +168,11 @@ Market price update
         ▼
 AlertService.handle_price(symbol, price)   ← Observer entry point
         │
-        ├─ Condition strategies (Strategy) — above / below / crossing
+        ├─ Condition strategies (Strategy): above / below / crossing
         │    └─ build_condition(spec)       ← Factory
-        ├─ AlertRepository (Repository)     — SqliteAlertRepository (aiosqlite, WAL)
-        └─ NotificationService             — fans AlertEvent out to channels
-             └─ NotificationChannel (Adapter/Strategy) — in_app/toast/sound
+        ├─ AlertRepository (Repository): SqliteAlertRepository (aiosqlite, WAL)
+        └─ NotificationService: fans AlertEvent out to channels
+             └─ NotificationChannel (Adapter/Strategy): in_app/toast/sound
 ```
 
 - Domain model (`app/services/alerts/domain.py`) is storage- and UI-agnostic.
@@ -180,7 +180,7 @@ AlertService.handle_price(symbol, price)   ← Observer entry point
 - Services are injected into FastAPI via `app.state.alert_service`
   (dependency injection / composition root in `app/main.py`).
 - `tui_client/` talks to the REST API through `AlertApiClient`
-  (`HttpAlertApi` by default) — the TUI never evaluates conditions.
+  (`HttpAlertApi` by default): the TUI never evaluates conditions.
 - The TUI also runs a `PriceChangeMonitor` worker (60s quote poll →
   threshold toast) and persists user settings to JSON
   (`tui_client/settings.py`). The API reads only the delivery preference from
@@ -196,7 +196,7 @@ Covers condition edge cases (including crossing transitions), alert lifecycle
 (ACTIVE→TRIGGERED/EXPIRED, DISABLED skip, once-only), ALL/ANY combination,
 notification emission (mocked channels), the full REST surface (CRUD,
 validation errors, status codes), and TUI flows via Textual's pilot (open
-modal, add condition, create, validation, cancel — no sleeps).
+modal, add condition, create, validation, cancel: no sleeps).
 
 Test modules: `test_conditions`, `test_alert_service`, `test_repository`,
 `test_sqlite_repository`, `test_api_alerts`, `test_api_market`,
@@ -227,22 +227,22 @@ Test modules: `test_conditions`, `test_alert_service`, `test_repository`,
 
 ### To cover (roadmap)
 
-- [ ] **Live WebSocket feed** — `WSMsg` schema exists but no endpoint is
+- [ ] **Live WebSocket feed**: `WSMsg` schema exists but no endpoint is
   mounted; prices are polled over REST today. Add `/market/ws` for
   candles/quotes push.
-- [ ] **Real notification channels** — `toast`/`sound`/`push`/`email` are no-op
+- [ ] **Real notification channels**: `toast`/`sound`/`push`/`email` are no-op
   placeholders; add Email, Webhook, Discord, Telegram adapters.
-- [ ] **Portfolio** — settings expose a "portfolio" source, but the monitor
+- [ ] **Portfolio**: settings expose a "portfolio" source, but the monitor
   returns nothing for it (no holdings feature yet).
-- [ ] **Charts & indicators** — `plotly` is a dependency but candlestick
+- [ ] **Charts & indicators**: `plotly` is a dependency but candlestick
   rendering / technical indicators are not implemented; the TUI shows OHLC only.
-- [ ] **Binance screeners** — `fetch_screeners` / `fetch_screener_search` raise
+- [ ] **Binance screeners**: `fetch_screeners` / `fetch_screener_search` raise
   `NotImplementedError` (HTTP 400).
-- [ ] **Auto alert evaluation** — alerts fire only via `POST /alerts/evaluate`;
+- [ ] **Auto alert evaluation**: alerts fire only via `POST /alerts/evaluate`;
   wire the price monitor / market stream into `AlertService.handle_price`.
-- [ ] **In-app notification log** — `InAppChannel` keeps events in memory but
+- [ ] **In-app notification log**: `InAppChannel` keeps events in memory but
   the TUI does not surface them yet.
-- [ ] **Adapter lifecycle** — adapters are built per request (no shared HTTP
+- [ ] **Adapter lifecycle**: adapters are built per request (no shared HTTP
   client); move to a managed lifespan.
-- [ ] **Project tooling** — no linter/formatter/typechecker, CI, or release
+- [ ] **Project tooling**: no linter/formatter/typechecker, CI, or release
   automation yet; add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `RELEASES.md`.
