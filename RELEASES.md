@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PATCH` — backward-compatible bug fixes.
 
 The version is defined once in `pyproject.toml` (`[project].version`) and
-mirrored by the FastAPI app title (`app/main.py`). Tags are named `vX.Y.Z`.
+mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
 
 ## [Unreleased]
 
@@ -74,5 +74,5 @@ Initial release.
   repositories, the REST surface, notification delivery, settings, and TUI
   flows via Textual's pilot.
 
-[Unreleased]: https://github.com/corderkrow/trading-tui/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/corderkrow/trading-tui/releases/tag/v0.1.0
+[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.1.0...HEAD
+[0.1.0]: https://github.com/corderkrow/trading-tui/releases/tag/0.1.0
