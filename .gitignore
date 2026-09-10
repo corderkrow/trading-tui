@@ -209,6 +209,13 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Trading TUI
+alerts.db
+alerts.db-wal
+alerts.db-shm
+data/
+content_engine/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

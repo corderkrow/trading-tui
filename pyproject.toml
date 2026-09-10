@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-tui"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",       # Backend API
+    "uvicorn[standard]>=0.34.0", # ASGI server + auto reload
+    "httpx>=0.28.0",          # Async HTTP client
+    "textual>=0.85.0",        # TUI declarativo
+    "plotly>=6.0.0",          # Gráficos SVG embebibles
+    "websockets>=14.0",       # WebSocket support
+    "pydantic-settings>=2.7.0", # Settings from env vars
+    "aiosqlite>=0.20.0",      # Async SQLite (alerts persistence)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",          # Unit tests
+    "pytest-asyncio>=0.24.0", # Async test support
+    "textual-dev>=1.5.0",     # Dev tools for textual
+]
+
+[project.scripts]
+trading-tui = "tui_client.app:main"   # TUI (alerts console)
+trading-tui-api = "app.main:run_api"  # FastAPI server
+
+[tool.setuptools.packages.find]
+include = ["app*", "tui_client*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

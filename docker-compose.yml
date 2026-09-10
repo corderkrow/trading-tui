@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8333:8333"
+    env_file:
+      - .env
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      # Named volume → SQLite file survives rebuilds/restarts
+      - alerts-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  alerts-data:

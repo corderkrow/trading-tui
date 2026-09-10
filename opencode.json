@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/mimo-v2.5",
+  "permission": {
+    "grep": "allow",
+    "glob": "allow",
+    "lsp": "allow",
+    "question": "allow"
+  },
+  "mcp": {
+    "caveman-shrink": {
+      "enabled": false
+    }
+  }
+}
