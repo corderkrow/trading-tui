@@ -202,6 +202,14 @@ Test modules: `test_conditions`, `test_alert_service`, `test_repository`,
 `test_sqlite_repository`, `test_api_alerts`, `test_api_market`,
 `test_notifications_delivery`, `test_settings`, `test_tui`.
 
+## Versioning
+
+This project follows [Semantic Versioning v2.0.0](https://semver.org/spec/v2.0.0.html).
+Public APIs are not broken without a major version bump: breaking changes to
+the HTTP endpoints, the CLI/console scripts, or the persisted alert/settings
+formats require a `MAJOR` release. See [RELEASES.md](RELEASES.md) for the
+release history and full policy.
+
 ## Project status
 
 ### Done
