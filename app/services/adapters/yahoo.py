@@ -1,9 +1,12 @@
 """Yahoo Finance adapter implementation — no API key required."""
 
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+
 import httpx
 
 from app.models.candle import CandleOHLCV
-from app.models.ticker import Ticker
+from app.models.ticker import NewsHit, SearchHit, Ticker
 from app.services.adapters.base import MarketDataAdapter
 
 # Yahoo interval mapping
@@ -123,6 +126,91 @@ class YahooAdapter(MarketDataAdapter):
         resp.raise_for_status()
         quotes = resp.json()["finance"]["result"][0]["quotes"]
         return [self._to_ticker(q) for q in quotes]
+
+    # quote-asset suffixes users type without a dash: "btcusd", "bnbusdt"
+    _QUOTE_SUFFIXES = ("usdt", "usdc", "busd", "fdusd", "tusd", "usd")
+
+    @classmethod
+    def _crypto_query_variants(cls, query: str) -> list[str]:
+        """Alternative queries for concatenated crypto pairs like "btcusd"."""
+        q = query.strip().lower()
+        variants: list[str] = []
+        for suffix in cls._QUOTE_SUFFIXES:
+            if q.endswith(suffix) and len(q) > len(suffix):
+                base = q[: -len(suffix)]
+                variants.append(f"{base}-{suffix}")
+                variants.append(base)
+                break
+        return variants
+
+    async def search_symbols(self, query: str, limit: int = 10) -> list[SearchHit]:
+        """Free-text symbol lookup over the full Yahoo universe."""
+        hits = await self._search_symbols_raw(query, limit)
+        if hits:
+            return hits
+        # Yahoo search doesn't match concatenated pairs ("btcusd"); retry dashed/base form
+        for variant in self._crypto_query_variants(query):
+            hits = await self._search_symbols_raw(variant, limit)
+            if hits:
+                return hits
+        return hits
+
+    async def _search_symbols_raw(self, query: str, limit: int = 10) -> list[SearchHit]:
+        resp = await self._client.get(
+            "/v1/finance/search",
+            params={"q": query, "quotesCount": limit, "newsCount": 0, "listsCount": 0},
+        )
+        resp.raise_for_status()
+        hits = []
+        for q in resp.json().get("quotes", []):
+            if not q.get("symbol") or q.get("quoteType") in ("OPTION", "FUTURE"):
+                continue
+            name = q.get("shortname") or q.get("longname") or q.get("shortName") or q.get("longName")
+            hits.append(
+                SearchHit(
+                    symbol=q["symbol"],
+                    name=name,
+                    exchange=q.get("exchDisp") or q.get("exchange"),
+                    quote_type=q.get("quoteType"),
+                )
+            )
+        return hits
+
+    async def fetch_news(self, symbol: str, limit: int = 10) -> list[NewsHit]:
+        """Latest news for the symbol (Yahoo per-symbol RSS headline feed)."""
+        resp = await self._client.get(
+            "https://feeds.finance.yahoo.com/rss/2.0/headline",
+            params={"s": symbol, "region": "US", "lang": "en-US"},
+        )
+        resp.raise_for_status()
+        channel = ET.fromstring(resp.text).find("channel")
+        if channel is None:
+            return []
+        hits: list[NewsHit] = []
+        for item in channel.findall("item"):
+            title = item.findtext("title")
+            if not title:
+                continue
+            hits.append(
+                NewsHit(
+                    title=title,
+                    link=item.findtext("link"),
+                    publisher=item.findtext("source"),
+                    published_at=self._parse_pubdate(item.findtext("pubDate")),
+                )
+            )
+            if len(hits) >= limit:
+                break
+        return hits
+
+    @staticmethod
+    def _parse_pubdate(value: str | None) -> int | None:
+        if not value:
+            return None
+        try:
+            return int(parsedate_to_datetime(value).timestamp())
+        except (TypeError, ValueError):
+            return None
 
     async def _get_crumb(self) -> tuple[str, str]:
         """Cookie A3 + crumb pair required by the custom screener endpoint."""

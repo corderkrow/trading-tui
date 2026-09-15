@@ -58,3 +58,76 @@ def test_no_crossing_without_crossing_the_target():
     assert not c.evaluate(ctx(101, previous=102))
     assert not c.evaluate(ctx(99, previous=99))
     assert not c.evaluate(ctx(101, previous=101))
+
+
+def ctx_change(
+    price: float,
+    change: float | None,
+    previous_change: float | None = None,
+) -> MarketContext:
+    return MarketContext(
+        symbol="BTCUSDT",
+        price=price,
+        change=change,
+        previous_change=previous_change,
+    )
+
+
+def test_rises_by_requires_history():
+    c = cond(Operator.RISES_BY, 2)
+    assert not c.evaluate(ctx_change(102, change=None))
+
+
+def test_rises_by_percent_threshold():
+    c = cond(Operator.RISES_BY, 2)
+    assert not c.evaluate(ctx_change(101, change=1.99))
+    assert c.evaluate(ctx_change(102, change=2.0))
+    assert c.evaluate(ctx_change(120, change=20.0))
+
+
+def test_falls_by_percent_threshold():
+    c = cond(Operator.FALLS_BY, 2)
+    assert not c.evaluate(ctx_change(98, change=-1.99))
+    assert c.evaluate(ctx_change(98, change=-2.0))
+    assert c.evaluate(ctx_change(80, change=-20.0))
+
+
+def test_falls_by_ignores_rise():
+    c = cond(Operator.FALLS_BY, 2)
+    assert not c.evaluate(ctx_change(110, change=10.0))
+
+
+def test_turns_positive_requires_two_changes():
+    c = cond(Operator.TURNS_POSITIVE, 1)
+    assert not c.evaluate(ctx_change(101, change=1.0, previous_change=None))
+
+
+def test_turns_positive():
+    c = cond(Operator.TURNS_POSITIVE, 1)
+    # negative -> positive
+    assert c.evaluate(ctx_change(101, change=1.0, previous_change=-0.5))
+    # zero -> positive
+    assert c.evaluate(ctx_change(100, change=0.5, previous_change=0.0))
+    # stays positive: no fire
+    assert not c.evaluate(ctx_change(102, change=2.0, previous_change=1.0))
+    # still negative: no fire
+    assert not c.evaluate(ctx_change(99, change=-1.0, previous_change=-2.0))
+
+
+def test_turns_negative():
+    c = cond(Operator.TURNS_NEGATIVE, 1)
+    # positive -> negative
+    assert c.evaluate(ctx_change(99, change=-1.0, previous_change=0.5))
+    # zero -> negative
+    assert c.evaluate(ctx_change(99, change=-0.5, previous_change=0.0))
+    # stays negative: no fire
+    assert not c.evaluate(ctx_change(97, change=-3.0, previous_change=-2.0))
+    # still positive: no fire
+    assert not c.evaluate(ctx_change(103, change=3.0, previous_change=1.0))
+
+
+def test_describe_percent_values():
+    spec = ConditionSpec(operator=Operator.RISES_BY, value=5, metric="change_pct")
+    assert spec.describe() == "Rises by 5%"
+    spec = ConditionSpec(operator=Operator.RISES_BY, value=5.25, metric="change_pct")
+    assert spec.describe() == "Rises by 5.25%"

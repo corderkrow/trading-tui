@@ -34,13 +34,25 @@ class Operator(StrEnum):
     ABOVE = "above"
     BELOW = "below"
     CROSSING = "crossing"
+    RISES_BY = "rises_by"
+    FALLS_BY = "falls_by"
+    TURNS_POSITIVE = "turns_positive"
+    TURNS_NEGATIVE = "turns_negative"
 
 
 OPERATOR_LABEL: dict[Operator, str] = {
     Operator.ABOVE: "Above",
     Operator.BELOW: "Below",
     Operator.CROSSING: "Crossing",
+    Operator.RISES_BY: "Rises by",
+    Operator.FALLS_BY: "Falls by",
+    Operator.TURNS_POSITIVE: "Turns positive",
+    Operator.TURNS_NEGATIVE: "Turns negative",
 }
+
+# Metrics tracked between consecutive price ticks (percent change, ...).
+CHANGE_METRIC = "change_pct"
+CHANGE_METRICS = frozenset({CHANGE_METRIC})
 
 
 @dataclass(frozen=True)
@@ -52,7 +64,10 @@ class ConditionSpec:
     metric: str = "price"
 
     def describe(self) -> str:
-        formatted = _format_value(self.value)
+        if self.metric in CHANGE_METRICS:
+            formatted = _format_percent(self.value)
+        else:
+            formatted = _format_value(self.value)
         return f"{OPERATOR_LABEL[self.operator]} {formatted}"
 
 
@@ -60,6 +75,12 @@ def _format_value(value: float) -> str:
     if value == int(value):
         return f"{int(value):,}"
     return f"{value:,.2f}"
+
+
+def _format_percent(value: float) -> str:
+    if value == int(value):
+        return f"{int(value)}%"
+    return f"{value:.2f}%"
 
 
 @dataclass
@@ -85,6 +106,8 @@ class MarketContext:
     symbol: str
     price: float
     previous_price: float | None = None
+    change: float | None = None
+    previous_change: float | None = None
     at: datetime = field(default_factory=now_utc)
 
 

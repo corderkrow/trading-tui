@@ -2,14 +2,16 @@
 
 from fastapi import APIRouter, Depends, Query
 from app.models.candle import CandleOHLCV
-from app.models.ticker import ScreenerResult, Ticker
+from app.models.ticker import NewsHit, ScreenerResult, SearchHit, Ticker
 from app.config import settings
 from app.services.adapters import get_adapter
 from app.services.adapters.base import MarketDataAdapter
 from app.services.market_data import (
     fetch_candles_async,
+    fetch_news,
     fetch_screener_search,
     fetch_screeners,
+    fetch_search_symbols,
     fetch_ticker,
 )
 
@@ -43,6 +45,32 @@ async def get_quotes(
         from app.core.exceptions import MarketError
         raise MarketError(message="No valid symbols provided", code=400)
     return await fetch_ticker(adapter=adapter, symbol_list=symbol_list)
+
+
+@router.get("/search", response_model=list[SearchHit])
+async def search_symbols(
+    q: str = Query(..., min_length=1, description="Free-text symbol query, e.g. apple, BTC"),
+    limit: int = Query(10, ge=1, le=25, description="Max results"),
+    adapter: MarketDataAdapter = Depends(get_market_adapter),
+):
+    try:
+        return await fetch_search_symbols(adapter=adapter, query=q, limit=limit)
+    except NotImplementedError as exc:
+        from app.core.exceptions import MarketError
+        raise MarketError(message=str(exc), code=400) from exc
+
+
+@router.get("/news", response_model=list[NewsHit])
+async def get_news(
+    symbol: str = Query(..., description="Symbol, e.g. BTC-USD, AAPL"),
+    limit: int = Query(10, ge=1, le=25, description="Max items"),
+    adapter: MarketDataAdapter = Depends(get_market_adapter),
+):
+    try:
+        return await fetch_news(adapter=adapter, symbol=symbol, limit=limit)
+    except NotImplementedError as exc:
+        from app.core.exceptions import MarketError
+        raise MarketError(message=str(exc), code=400) from exc
 
 
 @router.get("/screeners", response_model=list[Ticker])

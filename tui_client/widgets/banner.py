@@ -18,14 +18,14 @@ class BannerHeader(Header):
     DEFAULT_CSS = """
     BannerHeader {
         height: 2;
-        background: #282828;
+        background: $background;
     }
     BannerHeader > HeaderIcon {
-        color: #b8bb26;
+        color: $primary;
     }
     BannerHeader > HeaderTitle {
         text-align: left;
-        color: #b8bb26;
+        color: $primary;
         text-style: bold;
     }
     """
@@ -39,7 +39,7 @@ class BannerHeader(Header):
 
         title = self.screen_title or ""
         sub = self.screen_sub_title or ""
-        markup = f"[bold #b8bb26]{title}[/bold #b8bb26] [#8ec07c] · {sub}[/#8ec07c]"
+        markup = f"[bold $primary]{title}[/bold $primary] [$secondary] · {sub}[/$secondary]"
         return Content.from_markup(markup)
 
     def compose(self) -> ComposeResult:

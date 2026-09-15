@@ -12,6 +12,20 @@ class Ticker(BaseModel):
     market_cap: float | None = Field(default=None, description="Market capitalization")
 
 
+class SearchHit(BaseModel):
+    symbol: str = Field(..., description="Resolved symbol, e.g. AAPL")
+    name: str | None = Field(default=None, description="Instrument name")
+    exchange: str | None = Field(default=None, description="Exchange, e.g. NMS")
+    quote_type: str | None = Field(default=None, description="EQUITY, ETF, CURRENCY, …")
+
+
+class NewsHit(BaseModel):
+    title: str = Field(..., description="News headline")
+    link: str | None = Field(default=None, description="Article URL")
+    publisher: str | None = Field(default=None, description="Publisher name")
+    published_at: int | None = Field(default=None, description="Unix timestamp in seconds")
+
+
 class ScreenerResult(BaseModel):
     total: int = Field(..., description="Total matches in the full universe")
     quotes: list[Ticker] = Field(default_factory=list)

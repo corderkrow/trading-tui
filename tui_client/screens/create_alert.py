@@ -13,10 +13,16 @@ from textual.widgets import Button, Checkbox, Input, Label, Select
 from tui_client.api import AlertApiClient, ApiError
 
 OPERATORS = [
-    ("Above", "above"),
-    ("Below", "below"),
-    ("Crossing", "crossing"),
+    ("Above", "price", "above"),
+    ("Below", "price", "below"),
+    ("Crossing", "price", "crossing"),
+    ("Rises by %", "change_pct", "rises_by"),
+    ("Falls by %", "change_pct", "falls_by"),
+    ("Turns positive", "change_pct", "turns_positive"),
+    ("Turns negative", "change_pct", "turns_negative"),
 ]
+OPERATOR_OPTIONS = [(label, op) for label, _metric, op in OPERATORS]
+OPERATOR_METRIC = {op: metric for _label, metric, op in OPERATORS}
 TRIGGERS = [
     ("Once only", "ONCE"),
     ("Every time", "EVERY_TIME"),
@@ -67,7 +73,7 @@ class CreateAlertModal(ModalScreen[dict | None]):
 
     def _add_condition_row(self) -> None:
         index = len(self._condition_rows)
-        operator = Select(OPERATORS, value="crossing", allow_blank=False, id=f"op-{index}")
+        operator = Select(OPERATOR_OPTIONS, value="crossing", allow_blank=False, id=f"op-{index}")
         value = Input(placeholder="Target value", id=f"val-{index}")
         remove = Button("Remove", id=f"rm-{index}", variant="error")
         remove.disabled = index == 0
@@ -129,7 +135,13 @@ class CreateAlertModal(ModalScreen[dict | None]):
                 raise ValueError(f"Value '{raw}' must be a number") from None
             if value <= 0:
                 raise ValueError("Value must be greater than 0")
-            conditions.append({"metric": "price", "operator": operator_value, "value": value})
+            conditions.append(
+                {
+                    "metric": OPERATOR_METRIC.get(operator_value, "price"),
+                    "operator": operator_value,
+                    "value": value,
+                }
+            )
         if not conditions:
             raise ValueError("At least one condition required")
 

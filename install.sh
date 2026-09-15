@@ -93,7 +93,7 @@ if [ ! -x "$VENV_DIR/bin/python" ]; then
     || die "venv failed. on debian/ubuntu install 'python3-venv', or use 'uv venv'."
 fi
 say "installing python dependencies..."
-"$VENV_DIR/bin/python" -m pip install --quiet --disable-pip-version-check "$SRC_DIR"
+"$VENV_DIR/bin/python" -m pip install --quiet --disable-pip-version-check --editable "$SRC_DIR"
 
 # --------------------------------------------------------------- link
 mkdir -p "$BIN_DIR"
@@ -108,7 +108,7 @@ if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
 fi
 
 printf '\n'
-cat <<EOF
+printf '%b' "$(cat <<EOF
   ${GREEN}  ready. run 'trading-tui' to open the desk.${RESET}
 
   ${DIM}  quickstart${RESET}
@@ -121,3 +121,4 @@ cat <<EOF
 
   ${DIM}  uninstall: rm -rf $PREFIX_DIR $BIN_DIR/trading-tui $BIN_DIR/trading-tui-api${RESET}
 EOF
+)"

@@ -65,6 +65,7 @@ class FakeApi:
     async def get_screeners(self, scr_id: str, count: int = 5) -> list[QuoteView]:
         self.screener_calls = getattr(self, "screener_calls", [])
         self.screener_calls.append(scr_id)
+        self._universe = [f"{scr_id}-{i}" for i in range(count)]
         return [
             QuoteView(
                 symbol=f"{scr_id}-{i}",
@@ -77,11 +78,19 @@ class FakeApi:
             for i in range(count)
         ]
 
+    async def search_symbols(self, query: str, limit: int = 10):
+        from tui_client.api import SearchHitView
+
+        universe = getattr(self, "_universe", [])
+        matched = [s for s in universe if query in s.lower()]
+        return [SearchHitView(symbol=s, name=s) for s in matched]
+
     async def search_screeners(self, filters: dict, size: int = 50, offset: int = 0, sort: str = "marketcap"):
         from tui_client.api import ScreenerResultView
 
         self.screener_search = getattr(self, "screener_search", [])
         self.screener_search.append({"filters": filters, "size": size, "sort": sort})
+        self._universe = [f"F{i}" for i in range(size)]
         quotes = [
             QuoteView(symbol=f"F{i}", price=float(i), change_24h=0.1 * i)
             for i in range(min(size, 3))

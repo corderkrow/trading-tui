@@ -16,7 +16,7 @@ from app.services.user_prefs import allowed_channels
 def create_app(alert_service: AlertService | None = None) -> FastAPI:
     app = FastAPI(
         title="Trading TUI API",
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )

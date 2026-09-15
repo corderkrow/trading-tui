@@ -158,6 +158,8 @@ class AlertsApp(App[None]):
             watchlists=dict(wl.watchlists),
             active_watchlist=wl.active,
             on_watchlist_change=self._on_watchlist_change,
+            watchlist_mode=wl.mode,
+            display=self.user.display,
         )
         self.push_screen(self.prices_screen)
         self.run_worker(self.monitor.run(), exclusive=True, group="price-monitor")
@@ -171,18 +173,21 @@ class AlertsApp(App[None]):
     def action_settings(self) -> None:
         self.push_screen(SettingsModal(self.user), callback=self._on_settings_saved)
 
+    def _apply_display(self, display) -> None:
+        """Push display settings to already-mounted screens."""
+        if self.prices_screen.is_mounted:
+            self.prices_screen.apply_display(display)
+
     def _on_settings_saved(self, updated: UserSettings | None) -> None:
         if updated is None:
             return
         self.user = updated
+        self._apply_display(updated.display)
         ps = self.prices_screen
+        ps.watchlist_mode = updated.watchlist.mode
         ps.watchlists = dict(updated.watchlist.watchlists)
-        if ps.mode == "w":
-            if ps.active_watchlist not in ps.watchlists:
-                ps.active_watchlist = updated.watchlist.active
-            ps.watchlist = list(ps.watchlists[ps.active_watchlist])
-        else:
-            ps.watchlist = updated.watchlist.active_symbols()
+        ps.active_watchlist = updated.watchlist.active
+        ps.watchlist = list(updated.watchlist.active_symbols())
         ps.run_worker(ps.reload())
 
     async def _on_price_change(self, symbol: str, change: float, threshold: float) -> None:

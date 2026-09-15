@@ -80,6 +80,10 @@ class AlertListScreen(Screen[None]):
         self.app.switch_screen(prices)
 
     def action_new_alert(self) -> None:
+        display = getattr(self.app.user, "display", None)
+        if display is not None and display.disable_custom_alerts:
+            self.notify("Custom alerts are disabled in settings", severity="warning")
+            return
         modal = CreateAlertModal(self.api, default_symbol=self.default_symbol)
         self.app.push_screen(modal, callback=self._on_modal_result)
 

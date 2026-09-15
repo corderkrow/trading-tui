@@ -48,12 +48,58 @@ class PriceCrossingCondition:
         return crossed_up or crossed_down
 
 
+class _ChangePercentCondition:
+    """Base for conditions over percent change between consecutive ticks."""
+
+    def __init__(self, spec: ConditionSpec):
+        self.spec = spec
+
+    def evaluate(self, context: MarketContext) -> bool:  # pragma: no cover - abstract
+        raise NotImplementedError
+
+
+class PriceRisesByCondition(_ChangePercentCondition):
+    """Fires when price compared to the previous tick rose by >= value percent."""
+
+    def evaluate(self, context: MarketContext) -> bool:
+        return context.change is not None and context.change >= self.spec.value
+
+
+class PriceFallsByCondition(_ChangePercentCondition):
+    """Fires when price compared to the previous tick fell by >= value percent."""
+
+    def evaluate(self, context: MarketContext) -> bool:
+        return context.change is not None and context.change <= -self.spec.value
+
+
+class PriceTurnsPositiveCondition(_ChangePercentCondition):
+    """Fires when the percent change turns positive (<= 0 on the previous tick)."""
+
+    def evaluate(self, context: MarketContext) -> bool:
+        if context.previous_change is None or context.change is None:
+            return False
+        return context.previous_change <= 0 and context.change > 0
+
+
+class PriceTurnsNegativeCondition(_ChangePercentCondition):
+    """Fires when the percent change turns negative (>= 0 on the previous tick)."""
+
+    def evaluate(self, context: MarketContext) -> bool:
+        if context.previous_change is None or context.change is None:
+            return False
+        return context.previous_change >= 0 and context.change < 0
+
+
 def build_condition(spec: ConditionSpec) -> Condition:
     """Factory mapping a ConditionSpec to its strategy implementation."""
     strategies: dict[Operator, type[Condition]] = {
         Operator.ABOVE: PriceAboveCondition,
         Operator.BELOW: PriceBelowCondition,
         Operator.CROSSING: PriceCrossingCondition,
+        Operator.RISES_BY: PriceRisesByCondition,
+        Operator.FALLS_BY: PriceFallsByCondition,
+        Operator.TURNS_POSITIVE: PriceTurnsPositiveCondition,
+        Operator.TURNS_NEGATIVE: PriceTurnsNegativeCondition,
     }
     try:
         strategy_cls = strategies[spec.operator]

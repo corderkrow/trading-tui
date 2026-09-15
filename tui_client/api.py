@@ -127,6 +127,32 @@ class CandleView:
 
 
 @dataclass
+class NewsItemView:
+    """UI representation of a news article for a symbol."""
+
+    title: str
+    publisher: str | None = None
+    published_at: int | None = None
+    link: str | None = None
+
+    @classmethod
+    def from_json(cls, data: dict) -> "NewsItemView":
+        return cls(
+            title=data["title"],
+            publisher=data.get("publisher"),
+            published_at=data.get("published_at"),
+            link=data.get("link"),
+        )
+
+    def published_text(self) -> str:
+        if not self.published_at:
+            return "—"
+        from datetime import datetime, timezone
+        dt = datetime.fromtimestamp(self.published_at, tz=timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M")
+
+
+@dataclass
 class ScreenerResultView:
     """UI representation of a custom screener page."""
 
@@ -139,6 +165,14 @@ class ScreenerResultView:
             total=data["total"],
             quotes=[QuoteView.from_json(q) for q in data.get("quotes", [])],
         )
+
+
+@dataclass
+class SearchHitView:
+    """UI representation of an exchange symbol lookup hit."""
+
+    symbol: str
+    name: str | None = None
 
 
 @dataclass
@@ -200,6 +234,8 @@ class AlertApiClient(Protocol):
     async def enable_alert(self, alert_id: str) -> AlertView: ...
     async def disable_alert(self, alert_id: str) -> AlertView: ...
     async def get_last_candle(self, symbol: str) -> CandleView | None: ...
+    async def get_news(self, symbol: str, limit: int = 10) -> list[NewsItemView]: ...
+    async def search_symbols(self, query: str, limit: int = 10) -> list[SearchHitView]: ...
 
 
 class HttpAlertApi:
@@ -237,6 +273,10 @@ class HttpAlertApi:
         data = await self._request("GET", "/market/screeners", params={"scr_id": scr_id, "count": count})
         return [QuoteView.from_json(item) for item in data]
 
+    async def search_symbols(self, query: str, limit: int = 10) -> list[SearchHitView]:
+        data = await self._request("GET", "/market/search", params={"q": query, "limit": limit})
+        return [SearchHitView(symbol=h["symbol"], name=h.get("name")) for h in data]
+
     async def search_screeners(
         self,
         filters: dict,
@@ -257,6 +297,10 @@ class HttpAlertApi:
         if not data:
             return None
         return CandleView.from_json(data[-1])
+
+    async def get_news(self, symbol: str, limit: int = 10) -> list[NewsItemView]:
+        data = await self._request("GET", "/market/news", params={"symbol": symbol, "limit": limit})
+        return [NewsItemView.from_json(item) for item in data]
 
     async def _request(self, method: str, path: str, **kwargs):
         resp = await self._client.request(method, path, **kwargs)

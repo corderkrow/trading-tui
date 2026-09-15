@@ -23,9 +23,13 @@ from app.services.alerts.domain import (
 
 
 class ConditionRequest(BaseModel):
-    metric: Literal["price"] = "price"
+    metric: Literal["price", "change_pct"] = "price"
     operator: Operator
-    value: float = Field(..., gt=0, description="Target value, must be > 0")
+    value: float = Field(
+        ...,
+        gt=0,
+        description="Target value, must be > 0 (percent for change-based metrics)",
+    )
 
     def to_spec(self) -> ConditionSpec:
         return ConditionSpec(operator=self.operator, value=self.value, metric=self.metric)

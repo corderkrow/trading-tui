@@ -42,8 +42,9 @@ class AlertService:
         self.repository = repository
         self.notifications = notifications or NotificationService()
         self._clock = clock
-        # Previous price per (symbol, metric, operator, value) — needed for crossing.
-        self._history: dict[tuple[str, str, str, float], float] = {}
+        # Previous tick state per symbol — needed for crossing/variation/turn conditions.
+        self._previous_prices: dict[str, float] = {}
+        self._previous_changes: dict[str, float] = {}
 
     async def create(self, request: CreateAlertRequest) -> Alert:
         now = self._clock()
@@ -124,17 +125,35 @@ class AlertService:
         return triggered
 
     async def _matches(self, alert: Alert, symbol: str, price: float, now: datetime) -> bool:
+        previous_price = self._previous_prices.get(symbol)
+        change = self._percent_change(previous_price, price)
+        previous_change = self._previous_changes.get(symbol)
         results: list[bool] = []
         for spec in alert.conditions:
-            history_key = self._history_key(symbol, spec)
-            previous = self._history.get(history_key)
-            context = MarketContext(symbol=symbol, price=price, previous_price=previous, at=now)
+            context = MarketContext(
+                symbol=symbol,
+                price=price,
+                previous_price=previous_price,
+                change=change,
+                previous_change=previous_change,
+                at=now,
+            )
             condition = build_condition(spec)
             results.append(condition.evaluate(context))
-            self._history[history_key] = price
         if alert.match_mode == MatchMode.ANY:
-            return any(results)
-        return all(results)
+            matched = any(results)
+        else:
+            matched = all(results)
+        self._previous_prices[symbol] = price
+        if change is not None:
+            self._previous_changes[symbol] = change
+        return matched
+
+    @staticmethod
+    def _percent_change(previous_price: float | None, price: float) -> float | None:
+        if previous_price is None or previous_price == 0:
+            return None
+        return (price - previous_price) / previous_price * 100
 
     async def _expire_if_needed(self, alert: Alert) -> None:
         if (
@@ -150,10 +169,6 @@ class AlertService:
             alert.status = AlertStatus.EXPIRED
             await self.repository.update(alert)
             raise AlertExpired()
-
-    @staticmethod
-    def _history_key(symbol: str, spec: ConditionSpec) -> tuple[str, str, str, float]:
-        return (symbol, spec.metric, spec.operator.value, spec.value)
 
     def _default_message(self, request: CreateAlertRequest) -> str:
         descriptions = [c.to_spec().describe() for c in request.conditions]

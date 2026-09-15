@@ -14,6 +14,7 @@ from textual.widgets import Button, DataTable, Footer, Input, Label, Static, Tab
 from tui_client.widgets import BannerHeader
 
 from tui_client.api import AlertApiClient, ApiError, CandleView, QuoteView
+from tui_client.screens.symbol_info import SymbolInfoScreen
 
 DEFAULT_WATCHLIST = ["BTC-USD", "ETH-USD", "SOL-USD", "AAPL", "TSLA", "NVDA"]
 
@@ -135,6 +136,8 @@ class PricesScreen(Screen[None]):
         watchlists: dict[str, list[str]] | None = None,
         active_watchlist: str = "default",
         on_watchlist_change=None,
+        watchlist_mode: str = "single",
+        display=None,
     ) -> None:
         super().__init__()
         self.api = api
@@ -144,6 +147,7 @@ class PricesScreen(Screen[None]):
         self.active_watchlist = active_watchlist
         self.watchlist = list(self.watchlists[self.active_watchlist])
         self.on_watchlist_change = on_watchlist_change
+        self.watchlist_mode = watchlist_mode
         self.mode: str = "t"
         self.change_filter: str | None = None
         self._quotes: list[QuoteView] = []
@@ -155,6 +159,42 @@ class PricesScreen(Screen[None]):
         self._alert_states: dict[str, str] = {}
         self._candles: dict[str, CandleView] = {}
         self._search: str = ""
+        self._server_search: bool = False
+        self._search_timer = None
+        self._refresh_timer = None
+        self._rotation_timer = None
+        self._display = display
+
+    def apply_display(self, display) -> None:
+        """Restart the auto-refresh + rotation intervals from display settings."""
+        self._display = display
+        self._start_refresh_timer()
+        self._start_rotation_timer()
+
+    def _start_refresh_timer(self) -> None:
+        if self._refresh_timer is not None:
+            self._refresh_timer.stop()
+            self._refresh_timer = None
+        self._refresh_timer = self.set_timer(self._display.refresh_interval_minutes * 60, self._auto_refresh)
+
+    def _auto_refresh(self) -> None:
+        self._start_refresh_timer()
+        self.run_worker(self.reload())
+
+    def _start_rotation_timer(self) -> None:
+        if self._rotation_timer is not None:
+            self._rotation_timer.stop()
+            self._rotation_timer = None
+        if self._display is None:
+            return
+        self._rotation_timer = self.set_timer(
+            self._display.stock_rotation_interval, self._rotate_watchlist
+        )
+
+    def _rotate_watchlist(self) -> None:
+        self._start_rotation_timer()
+        if self.mode == "w" and self.is_running:
+            self._switch_watchlist_next()
 
     def compose(self) -> ComposeResult:
         yield BannerHeader()
@@ -188,6 +228,9 @@ class PricesScreen(Screen[None]):
         self._update_mode_label()
         table.focus()
         self.run_worker(self.reload())
+        if self._display is not None:
+            self._start_refresh_timer()
+            self._start_rotation_timer()
 
     def _update_tabs(self) -> None:
         tabs = self.query_one("#watchlist-tabs", Static)
@@ -245,6 +288,8 @@ class PricesScreen(Screen[None]):
         )
 
     def _matches_search(self, quote: QuoteView) -> bool:
+        if self._server_search:
+            return True
         if not self._search:
             return True
         haystack = quote.symbol.lower()
@@ -344,6 +389,7 @@ class PricesScreen(Screen[None]):
                 quote.volume_text(),
                 quote.market_cap_text(),
                 self._alert_cell(quote.symbol),
+                key=quote.symbol,
             )
         self._update_mode_label()
 
@@ -392,7 +438,14 @@ class PricesScreen(Screen[None]):
                 self._candles[symbol] = result
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if self.mode == "s" and event.input.id == "filter":
+        if event.input.id == "search":
+            if self._search_timer is not None:
+                self._search_timer.stop()
+                self._search_timer = None
+            if self._search:
+                self.run_worker(self._run_server_search())
+            self.query_one("#prices-table", DataTable).focus()
+        elif self.mode == "s" and event.input.id == "filter":
             self._filters = self._parse_filters(event.value)
             self._screener_total = None
             self._page = 1
@@ -413,7 +466,33 @@ class PricesScreen(Screen[None]):
         if event.input.id == "search":
             self._search = event.value.strip().lower()
             self._page = 1
-            self._rebuild_table()
+            if not self._search:
+                self._server_search = False
+                self._rebuild_table()
+                return
+            if self._search_timer is not None:
+                self._search_timer.stop()
+            self._search_timer = self.set_timer(0.4, self._run_server_search)
+
+    async def _run_server_search(self) -> None:
+        """Look the search term up on the exchange, then show matched quotes."""
+        self._search_timer = None
+        term = self._search
+        if not term:
+            return
+        try:
+            hits = await self.api.search_symbols(term)
+            symbols = [hit.symbol for hit in hits]
+            quotes = await self.api.get_quotes(symbols) if symbols else []
+        except ApiError as exc:
+            self.notify(exc.message, severity="error")
+            return
+        if term != self._search:
+            return
+        self._server_search = True
+        self._quotes = quotes
+        self._page = 1
+        self._rebuild_table()
 
     def action_focus_search(self) -> None:
         self.query_one("#search", Input).focus()
@@ -473,6 +552,16 @@ class PricesScreen(Screen[None]):
         style = "green" if quote.change_24h >= 0 else "red"
         return f"[{style}]{quote.change_text()}[/]"
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Open symbol info (click or Enter) with stats + latest news."""
+        symbol = event.row_key.value
+        if not symbol:
+            return
+        quote = next((q for q in self._quotes if q.symbol == symbol), None)
+        if quote is None:
+            return
+        self.app.push_screen(SymbolInfoScreen(self.api, quote))
+
     def action_show_top(self) -> None:
         self._set_mode("t")
 
@@ -486,7 +575,12 @@ class PricesScreen(Screen[None]):
         self._set_mode("w")
 
     def action_next_watchlist(self) -> None:
-        if self.mode != "w" or len(self.watchlists) < 2:
+        if self.watchlist_mode != "multiple" or self.mode != "w":
+            return
+        self._switch_watchlist_next()
+
+    def _switch_watchlist_next(self) -> None:
+        if len(self.watchlists) < 2:
             return
         names = list(self.watchlists)
         idx = names.index(self.active_watchlist)
@@ -516,6 +610,12 @@ class PricesScreen(Screen[None]):
         self._filter_by_key("d")
 
     def action_new_watchlist(self) -> None:
+        if self.watchlist_mode != "multiple":
+            self.notify(
+                "Watchlist mode is 'single' — enable multiple watchlists in settings.",
+                severity="warning",
+            )
+            return
         self.app.push_screen(NewWatchlistModal(), callback=self._on_new_watchlist)
 
     def _on_new_watchlist(self, name: str | None) -> None:

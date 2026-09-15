@@ -31,6 +31,31 @@ mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
   `POST /alerts/evaluate` only).
 - Shared adapter HTTP-client lifecycle; linter / type checker / CI.
 
+## [0.2.0] - 2026-09-15
+
+### Added
+
+- **Percent-change alert conditions**: new `change_pct` metric with `rises_by`,
+  `falls_by`, `turns_positive` and `turns_negative` operators, evaluated against
+  the previous tick and selectable in the create-alert modal.
+- **Symbol search** (`GET /market/search`): free-text lookup over the full Yahoo
+  universe, with fallbacks for concatenated crypto pairs (`btcusd` → `BTC-USD`).
+- **Symbol news** (`GET /market/news`): latest per-symbol headlines via Yahoo's
+  RSS headline feed.
+- **Symbol info screen** in the TUI (select a row): quote stats plus latest news.
+- **Server-backed search** in the prices screen: typing a term resolves symbols
+  on the exchange and shows the matched quotes.
+- **Display settings**: refresh interval (5-60 min), watchlist rotation interval,
+  news display toggle and per-asset news count, and a "disable custom alerts"
+  switch; the settings modal now shows the app version.
+
+### Changed
+
+- Alert evaluation tracks previous price and percent change per symbol instead of
+  per-condition history, enabling the variation and turn conditions.
+- `install.sh` installs the package in editable mode; banner colors follow the
+  active Textual theme.
+
 ## [0.1.0] - unreleased
 
 Initial release.
@@ -74,5 +99,6 @@ Initial release.
   repositories, the REST surface, notification delivery, settings, and TUI
   flows via Textual's pilot.
 
-[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/corderkrow/trading-tui/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/corderkrow/trading-tui/releases/tag/0.1.0

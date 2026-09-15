@@ -52,3 +52,4 @@ No linter, formatter, or typechecker configured yet. No Makefile or task runner.
 - Adapter instances are created per-request via FastAPI DI — no shared client lifecycle.
 - Binance adapter uses `httpx.AsyncClient` with 10s timeout, 20 max connections.
 - TUI `AlertsApp` reuses a live server on :8333 if found — kill stale uvicorn/docker after changing `ADAPTER_NAME`.
+- User-facing `trading-tui` launcher uses `/home/piryguiry/.local/share/trading-tui/venv` with a **non-editable** pip copy (`install.sh` installs from `$SRC_DIR`). Repo fixes are invisible to that TUI until reinstalled: `~/.local/share/trading-tui/venv/bin/python -m pip install --quiet <repo>`. Verify with `diff` of `tui_client/screens/prices.py` checksums.

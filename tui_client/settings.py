@@ -80,9 +80,30 @@ class NotificationSettings(BaseModel):
         return sorted(set(thresholds))
 
 
+REFRESH_INTERVAL_MINUTES = (5, 10, 15, 30, 60)
+
+
+class DisplaySettings(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
+    disable_custom_alerts: bool = False
+    display_news: bool = True
+    news_per_asset: int = Field(default=5, ge=1, le=5)
+    stock_rotation_interval: int = Field(default=20, ge=1, le=3600)
+    refresh_interval_minutes: int = 15
+
+    @field_validator("refresh_interval_minutes")
+    @classmethod
+    def _valid_refresh(cls, v: int) -> int:
+        if v not in REFRESH_INTERVAL_MINUTES:
+            raise ValueError(f"refresh interval must be one of {REFRESH_INTERVAL_MINUTES}")
+        return v
+
+
 class UserSettings(BaseModel):
     watchlist: WatchlistSettings = Field(default_factory=WatchlistSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
+    display: DisplaySettings = Field(default_factory=DisplaySettings)
 
 
 def load_settings(path: Path = SETTINGS_PATH) -> UserSettings:

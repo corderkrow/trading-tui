@@ -231,6 +231,42 @@ async def test_disable_expired_rejected():
         await service.disable(alert.id)
 
 
+async def test_variation_threshold_and_turn_firing():
+    clock = _clock()
+    service, _ = make_service(clock=clock)
+    await service.create(
+        make_request(
+            conditions=[{"metric": "change_pct", "operator": "rises_by", "value": 2.0}],
+            trigger_mode="EVERY_TIME",
+        )
+    )
+    baseline = await service.handle_price("ETHUSDT", 100.0, at=clock())
+    assert baseline == []
+    small = await service.handle_price("ETHUSDT", 101.0, at=clock())
+    assert small == []  # +1% < threshold
+    big = await service.handle_price("ETHUSDT", 104.0, at=clock())
+    assert len(big) == 1  # +2.97% >= 2%
+
+
+async def test_turns_positive_fires_on_sign_flips_only():
+    clock = _clock()
+    service, _ = make_service(clock=clock)
+    await service.create(
+        make_request(
+            conditions=[{"metric": "change_pct", "operator": "turns_positive", "value": 1.0}],
+            trigger_mode="EVERY_TIME",
+        )
+    )
+    baseline = await service.handle_price("ETHUSDT", 100.0, at=clock())
+    assert baseline == []  # no change yet
+    down = await service.handle_price("ETHUSDT", 99.0, at=clock())
+    assert down == []  # negative change, not a turn
+    up = await service.handle_price("ETHUSDT", 101.0, at=clock())
+    assert len(up) == 1  # negative -> positive turn
+    up_again = await service.handle_price("ETHUSDT", 102.0, at=clock())
+    assert up_again == []  # still positive
+
+
 def _clock():
     class Clock:
         def __init__(self) -> None:

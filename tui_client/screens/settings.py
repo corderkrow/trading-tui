@@ -28,6 +28,10 @@ def _radio_set(options: list[tuple[str, str]], value: str, set_id: str) -> Radio
     return RadioSet(*buttons, id=set_id)
 
 
+VERSION = "0.2.0"
+REFRESH_CHOICES = [("5 min", 5), ("10 min", 10), ("15 min", 15), ("30 min", 30), ("1h", 60)]
+
+
 class SettingsModal(ModalScreen[UserSettings | None]):
     """Edit user settings; dismisses with updated settings or None on cancel."""
 
@@ -40,6 +44,7 @@ class SettingsModal(ModalScreen[UserSettings | None]):
     def compose(self) -> ComposeResult:
         wl = self.settings.watchlist
         n = self.settings.notifications
+        d = self.settings.display
         with VerticalScroll(id="modal-body"):
             yield Label("Settings", id="modal-title")
 
@@ -73,10 +78,21 @@ class SettingsModal(ModalScreen[UserSettings | None]):
             yield Label("Price alert delivery", classes="field-label")
             yield _radio_set(DELIVERIES, n.price_alert_delivery, "delivery")
 
+            yield Label("Display", classes="field-label")
+            yield Checkbox("Disable Custom Alerts", value=d.disable_custom_alerts, id="disable-custom-alerts")
+            yield Checkbox("Display news", value=d.display_news, id="display-news")
+            yield Label("News per asset (max 5)", classes="field-label")
+            yield Input(id="news-per-asset", value=str(d.news_per_asset))
+            yield Label("Stock rotation interval (seconds)", classes="field-label")
+            yield Input(id="rotation-interval", value=str(d.stock_rotation_interval))
+            yield Label("Refresh interval", classes="field-label")
+            yield _radio_set([(label, str(v)) for label, v in REFRESH_CHOICES], str(d.refresh_interval_minutes), "refresh-interval")
+
             yield Label("", id="error", classes="error")
             with Horizontal(id="modal-actions"):
                 yield Button("Cancel", id="cancel", variant="default")
                 yield Button("Save", id="save", variant="primary")
+            yield Label(f"Version: {VERSION}", id="version")
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         if event.checkbox.id == "th-custom":
@@ -156,6 +172,35 @@ class SettingsModal(ModalScreen[UserSettings | None]):
         if delivery is None:
             raise ValueError("Price alert delivery required")
 
+        news_raw = self.query_one("#news-per-asset", Input).value.strip()
+        try:
+            news_per_asset = int(news_raw)
+        except ValueError:
+            raise ValueError(f"News per asset '{news_raw}' must be a number (1-5)") from None
+        if not 1 <= news_per_asset <= 5:
+            raise ValueError(f"News per asset '{news_raw}' must be between 1 and 5")
+
+        rotation_raw = self.query_one("#rotation-interval", Input).value.strip()
+        try:
+            rotation = int(rotation_raw)
+        except ValueError:
+            raise ValueError(f"Stock rotation interval '{rotation_raw}' must be a number") from None
+        if not 1 <= rotation <= 3600:
+            raise ValueError(f"Stock rotation interval '{rotation_raw}' must be between 1 and 3600")
+
+        refresh = self._radio_value("refresh-interval")
+        if refresh is None:
+            raise ValueError("Refresh interval required")
+        refresh_minutes = int(refresh)
+
+        display = {
+            "disable_custom_alerts": self.query_one("#disable-custom-alerts", Checkbox).value,
+            "display_news": self.query_one("#display-news", Checkbox).value,
+            "news_per_asset": news_per_asset,
+            "stock_rotation_interval": rotation,
+            "refresh_interval_minutes": refresh_minutes,
+        }
+
         notifications = {
             "price_change_sources": sources,
             "price_change_thresholds": thresholds,
@@ -166,6 +211,7 @@ class SettingsModal(ModalScreen[UserSettings | None]):
             {
                 "watchlist": {"mode": mode, "watchlists": watchlists, "active": active},
                 "notifications": notifications,
+                "display": display,
             }
         )
 
