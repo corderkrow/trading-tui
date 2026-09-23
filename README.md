@@ -108,7 +108,9 @@ screener · `a` alerts · `p` back to prices · `n` new alert / new watchlist ·
 `r` refresh · `e`/`d`/`x` enable/disable/delete · `o` settings · `q` quit.
 Prices table: sort with `1`-`5` (symbol/price/chg %/volume/cap; press again to
 flip direction), filter with `f`/`u`/`d` (all/up/down), search with `/`, page
-with `[`/`]` (25 rows per page), cycle watchlists with `tab`. Columns:
+with `[`/`]` (25 rows per page), cycle the top-level lists with `tab`
+(in watchlist mode with multiple lists, cycle your watchlists with
+`ctrl+right`). Columns:
 Symbol / Name / Price / Chg % / OHLC / Volume / Cap / Alert.
 
 Screeners come from Yahoo's predefined lists (`most_actives`/`day_gainers`/
