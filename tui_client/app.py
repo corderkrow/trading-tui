@@ -16,22 +16,11 @@ from tui_client.screens.alert_list import AlertListScreen
 from tui_client.screens.prices import PricesScreen, DEFAULT_WATCHLIST
 from tui_client.screens.settings import SettingsModal
 from tui_client.settings import UserSettings, save_settings, user_settings
+from tui_client.themes import CODERKROW_DARK
 
 CSS = """
-/* ── Gruvbox palette (matches install.sh) ────────────── */
-$background: #282828;
-$surface: #1d2021;
-$panel: #3c3836;
-$primary: #b8bb26;      /* bright green   #b8bb26 */
-$secondary: #fabd2f;    /* bright yellow  #fabd2f */
-$accent: #8ec07c;       /* bright aqua    #8ec07c */
-$foreground: #ebdbb2;
-$text: #ebdbb2;
-$text-muted: #928374;   /* gray           #928374 */
-$text-disabled: #665c54;
-$error: #fb4934;
-$warning: #fabd2f;
-$success: #b8bb26;
+/* Colors come from the active Textual theme — default: coderkrow dark
+   (tui_client/themes.py, brand tokens in .ai/rules/brand/RULES.md). */
 
 AlertListScreen {
     layout: vertical;
@@ -142,6 +131,7 @@ class AlertsApp(App[None]):
         user: UserSettings | None = None,
     ) -> None:
         super().__init__()
+        self.register_theme(CODERKROW_DARK)
         self.api = api or HttpAlertApi()
         self.default_symbol = default_symbol
         self.user = user or user_settings
@@ -150,7 +140,7 @@ class AlertsApp(App[None]):
         )
 
     def on_mount(self) -> None:
-        self.theme = "gruvbox"
+        self.theme = CODERKROW_DARK.name
         self.alerts_screen = AlertListScreen(self.api, default_symbol=self.default_symbol)
         wl = self.user.watchlist
         self.prices_screen = PricesScreen(

@@ -15,36 +15,39 @@ BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 SRC_DIR="$PREFIX_DIR/src"
 VENV_DIR="$PREFIX_DIR/venv"
 
-# gruvbox dark palette (truecolor)
-GREEN='\033[38;2;184;187;38m'      # bright green  #b8bb26
-YELLOW='\033[38;2;250;189;47m'     # bright yellow #fabd2f
-AQUA='\033[38;2;142;192;124m'      # bright aqua   #8ec07c
-RED='\033[38;2;251;73;52m'         # bright red    #fb4934
-GRAY='\033[38;2;146;131;116m'      # gray          #928374
-FG='\033[38;2;235;219;178m'        # fg            #ebdbb2
-BG='\033[48;2;40;40;40m'           # bg            #282828
+# coderkrow brand palette — dark variant (truecolor)
+# tokens per .ai/rules/brand/RULES.md §2, matching tui_client/themes.py
+TEAL_LIGHT='\033[38;2;59;184;186m'  # #3bb8ba — accents, highlights, success
+TEAL_MID='\033[38;2;46;127;128m'    # #2e7f80 — interactive chrome, borders
+CYAN='\033[38;2;0;209;212m'         # #00d1d4 — signal only: active/on, focus
+DANGER='\033[38;2;200;60;60m'       # #c83c3c — errors, down deltas
+MUTED='\033[38;2;136;135;128m'      # #888780 — secondary text, captions
+FG='\033[38;2;232;230;223m'         # #e8e6df — ink, primary text
+BG='\033[48;2;17;17;16m'            # #111110 — bg, near-black (never #000)
 DIM='\033[2m'; RESET='\033[0m'
-if [ ! -t 1 ]; then GREEN=''; YELLOW=''; AQUA=''; RED=''; GRAY=''; FG=''; BG=''; DIM=''; RESET=''; fi
+if [ ! -t 1 ]; then
+  TEAL_LIGHT=''; TEAL_MID=''; CYAN=''; DANGER=''; MUTED=''; FG=''; BG=''; DIM=''; RESET=''
+fi
 
-say()  { printf '%b' "${GREEN}  >${RESET} $1\n"; }
-die()  { printf '%s\n' "  error: $1" >&2; exit 1; }
+say()  { printf '%b' "${TEAL_MID}  >${RESET} $1\n"; }
+die()  { printf '%b\n' "  ${DANGER}error:${RESET} $1" >&2; exit 1; }
 
 printf '%b' "$(cat <<EOF
-${BG}${YELLOW}  ░▀█▀░█▀▄░█▀█░█▀▄░▀█▀░█▀█░█▀▀░░░░░▀█▀░█░█░▀█▀${RESET}
-${BG}${YELLOW}  ░░█░░█▀▄░█▀█░█░█░░█░░█░█░█░█░▄▄▄░░█░░█░█░░█░${RESET}
-${BG}${YELLOW}  ░░▀░░▀░▀░▀░▀░▀▀░░▀▀▀░▀░▀░▀▀▀░░░░░░▀░░▀▀▀░▀▀▀${RESET}
-${BG}${AQUA}  ╭────────────────────────────────────────────────────────╮${RESET}
-${BG}${AQUA}  │${GREEN} trading-tui${GRAY}  ·  live market desk${YELLOW}      BTC-USD${FG}  \$95,431 ${AQUA}│${RESET}
-${BG}${FG}  │                                                        │${RESET}
-${BG}${AQUA}  │${FG}  ${GREEN}░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░▒▓${FG}  ${YELLOW}+2.14%${GRAY}   24h vol 12.4k${FG}         ${AQUA}│${RESET}
-${BG}${FG}  │                                                        │${RESET}
-${BG}${AQUA}  │${GRAY}  SYMBOL     LAST      Δ       ALERT            STATE   ${AQUA}│${RESET}
-${BG}${AQUA}  │${YELLOW}  BTC-USD${FG}    95,431.2  ${GREEN}+2.14%${FG}  ${GRAY}crosses 90,000${FG}    ${GREEN}armed${FG}  ${AQUA}│${RESET}
-${BG}${AQUA}  │${YELLOW}  ETH-USD${FG}     3,212.4  ${RED}-0.88%${FG}  ${GRAY}crosses  3,500${FG}    ${GREEN}armed${FG}  ${AQUA}│${RESET}
-${BG}${AQUA}  │${YELLOW}  SOL-USD${FG}       189.6  ${GREEN}+1.06%${FG}  ${GRAY}rsi < 30${FG}          ${GRAY}idle${FG}   ${AQUA}│${RESET}
-${BG}${FG}  │                                                        │${RESET}
-${BG}${AQUA}  │${GRAY}  q quit · a add alert · f filter · ws live feed${FG}        ${AQUA}│${RESET}
-${BG}${AQUA}  ╰────────────────────────────────────────────────────────╯${RESET}
+${BG}${TEAL_LIGHT}  ░▀█▀░█▀▄░█▀█░█▀▄░▀█▀░█▀█░█▀▀░░░░░▀█▀░█░█░▀█▀${RESET}
+${BG}${TEAL_LIGHT}  ░░█░░█▀▄░█▀█░█░█░░█░░█░█░█░█░▄▄▄░░█░░█░█░░█░${RESET}
+${BG}${TEAL_LIGHT}  ░░▀░░▀░▀░▀░▀░▀▀░░▀▀▀░▀░▀░▀▀▀░░░░░░▀░░▀▀▀░▀▀▀${RESET}
+${BG}${TEAL_MID}  ╭────────────────────────────────────────────────────────╮${RESET}
+${BG}${TEAL_MID}  │${TEAL_LIGHT} trading-tui${MUTED}  ·  live market desk${MUTED}      BTC-USD${FG}  \$95,431 ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │                                                        │${RESET}
+${BG}${TEAL_MID}  │${FG}  ${TEAL_LIGHT}░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░▒▓${TEAL_LIGHT}  +2.14%${MUTED}   24h vol 12.4k${FG}         ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │                                                        │${RESET}
+${BG}${TEAL_MID}  │${MUTED}  SYMBOL     LAST      Δ       ALERT            STATE   ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │${TEAL_LIGHT}  BTC-USD${FG}    95,431.2  ${TEAL_LIGHT}+2.14%${FG}  ${MUTED}crosses 90,000${FG}    ${CYAN}armed${FG}  ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │${TEAL_LIGHT}  ETH-USD${FG}     3,212.4  ${DANGER}-0.88%${FG}  ${MUTED}crosses  3,500${FG}    ${CYAN}armed${FG}  ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │${TEAL_LIGHT}  SOL-USD${FG}       189.6  ${TEAL_LIGHT}+1.06%${FG}  ${MUTED}rsi < 30${FG}          ${MUTED}idle${FG}   ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  │                                                        │${RESET}
+${BG}${TEAL_MID}  │${MUTED}  ${CYAN}q${MUTED} quit · ${CYAN}a${MUTED} add alert · ${CYAN}f${MUTED} filter · ${CYAN}ws${MUTED} live feed${FG}        ${TEAL_MID}│${RESET}
+${BG}${TEAL_MID}  ╰────────────────────────────────────────────────────────╯${RESET}
 EOF
 )"
 printf '\n\n'
@@ -109,16 +112,16 @@ fi
 
 printf '\n'
 printf '%b' "$(cat <<EOF
-  ${GREEN}  ready. run 'trading-tui' to open the desk.${RESET}
+  ${TEAL_LIGHT}  ready.${RESET} run '${TEAL_LIGHT}trading-tui${RESET}' to open the desk.
 
-  ${DIM}  quickstart${RESET}
-    trading-tui        TUI client (alerts console)
-    trading-tui-api    FastAPI market-data server (:8333)
+  ${MUTED}  quickstart${RESET}
+    ${TEAL_LIGHT}trading-tui${RESET}        TUI client (alerts console)
+    ${TEAL_LIGHT}trading-tui-api${RESET}    FastAPI market-data server (:8333)
 
-  ${DIM}  market data comes from the API — start it first:${RESET}
-    cp $SRC_DIR/.env.example $SRC_DIR/.env
-    cd $SRC_DIR && trading-tui-api & trading-tui
+  ${MUTED}  market data comes from the API — start it first:${RESET}
+    ${FG}cp $SRC_DIR/.env.example $SRC_DIR/.env${RESET}
+    ${FG}cd $SRC_DIR && trading-tui-api & trading-tui${RESET}
 
-  ${DIM}  uninstall: rm -rf $PREFIX_DIR $BIN_DIR/trading-tui $BIN_DIR/trading-tui-api${RESET}
+  ${MUTED}  uninstall: rm -rf $PREFIX_DIR $BIN_DIR/trading-tui $BIN_DIR/trading-tui-api${RESET}
 EOF
 )"

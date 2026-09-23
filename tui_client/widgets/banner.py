@@ -6,14 +6,12 @@ from textual.app import ComposeResult
 from textual.widgets import Header
 from textual.widgets._header import HeaderIcon, HeaderTitle
 
-# gruvbox dark palette (matches install.sh banner)
-
 # nf-md-candle — nerd font candlestick chart glyph
 _ICON = "\U000F1A0C"
 
 
 class BannerHeader(Header):
-    """Header styled like the install.sh gruvbox banner card."""
+    """Header card — colors come from the active theme (coderkrow dark)."""
 
     DEFAULT_CSS = """
     BannerHeader {

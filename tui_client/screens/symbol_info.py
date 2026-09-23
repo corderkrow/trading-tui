@@ -11,6 +11,7 @@ from textual.widgets import DataTable, Footer, Static
 from tui_client.widgets import BannerHeader
 
 from tui_client.api import AlertApiClient, CandleView, NewsItemView, QuoteView, format_price
+from tui_client.themes import MUTED
 
 STATS_ORDER = [
     ("Name", "name"),
@@ -120,7 +121,7 @@ class SymbolInfoScreen(Screen[None]):
             ("Change 24h", self._change_value()),
         ]
         if not self._candle_loaded:
-            rows.append(("OHLC", "[#928374]loading…[/]"))
+            rows.append(("OHLC", f"[{MUTED}]loading…[/]"))
         elif self._candle is None:
             rows.append(("OHLC", "—"))
         else:
@@ -136,7 +137,7 @@ class SymbolInfoScreen(Screen[None]):
             ("Market Cap", self.quote.market_cap_text()),
         ]
         for label, value in rows:
-            table.add_row(f"[#928374]{label}[/]", value)
+            table.add_row(f"[{MUTED}]{label}[/]", value)
 
     def _change_value(self) -> str:
         if self.quote.change_24h is None:

@@ -15,6 +15,7 @@ from tui_client.widgets import BannerHeader
 
 from tui_client.api import AlertApiClient, ApiError, CandleView, QuoteView
 from tui_client.screens.symbol_info import SymbolInfoScreen
+from tui_client.themes import CYAN, DANGER, INK, MUTED, TEAL_LIGHT, WARNING
 
 DEFAULT_WATCHLIST = ["BTC-USD", "ETH-USD", "SOL-USD", "AAPL", "TSLA", "NVDA"]
 
@@ -55,13 +56,13 @@ ALERT_STATE_LABELS = {
     "DISABLED": "idle",
 }
 
-SYMBOL_COLOR = "#83a598"
+SYMBOL_COLOR = TEAL_LIGHT
 
 ALERT_STATE_COLORS = {
-    "armed": "#b8bb26",
-    "triggered": "#fabd2f",
-    "expired": "#fb4934",
-    "idle": "#665c54",
+    "armed": CYAN,
+    "triggered": WARNING,
+    "expired": DANGER,
+    "idle": MUTED,
 }
 
 CHANGE_FILTERS: dict[str, tuple[str, str | None]] = {
@@ -252,7 +253,7 @@ class PricesScreen(Screen[None]):
 
     @staticmethod
     def _filter_color() -> str:
-        return "#ebdbb2"
+        return INK
 
     def _mode_name(self) -> str:
         if self.mode == "w":
@@ -538,7 +539,7 @@ class PricesScreen(Screen[None]):
         label = self._alert_states.get(symbol)
         if not label:
             return ""
-        color = ALERT_STATE_COLORS.get(label, "#ebdbb2")
+        color = ALERT_STATE_COLORS.get(label, INK)
         return f"[{color}]{label}[/]"
 
     def _ohlc_cell(self, symbol: str) -> str:

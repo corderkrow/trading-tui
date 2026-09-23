@@ -15,6 +15,7 @@ from tui_client.screens.prices import (
     MARKET_TABS,
     SYMBOL_COLOR,
 )
+from tui_client.themes import INK
 from tui_client.widgets import BannerHeader
 
 
@@ -62,7 +63,7 @@ class AlertListScreen(Screen[None]):
         table.clear()
         for alert in self._alerts:
             status_label = ALERT_STATE_LABELS.get(alert.status, alert.status.lower())
-            status_color = ALERT_STATE_COLORS.get(status_label, "#ebdbb2")
+            status_color = ALERT_STATE_COLORS.get(status_label, INK)
             table.add_row(
                 f"[{SYMBOL_COLOR}]{alert.symbol}[/]",
                 alert.condition_text(),
