@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from rich.text import Text
-from textual.widgets import Button, Checkbox, DataTable, Input, Label, Static
+from textual.widgets import Button, Checkbox, DataTable, Input, Label, Static, Tabs
 
 from tui_client.api import AlertView, ApiError, CandleView, QuoteView
 from tui_client.app import AlertsApp
@@ -167,6 +167,18 @@ async def test_list_displays_alerts(pilot_app):
     assert plain(table.get_row_at(0)[0]) == "ETHUSDT"
     assert "Crossing" in table.get_row_at(0)
     assert plain(table.get_row_at(1)[3]) == "ACTIVE"
+
+
+async def test_list_shows_empty_hint_when_no_alerts():
+    app = AlertsApp(api=FakeApi([]), default_symbol="BTCUSDT")
+    async with app.run_test() as pilot:
+        for _ in range(200):
+            if isinstance(app.screen, AlertListScreen):
+                break
+            await pilot.press("a")
+            await pilot.pause()
+        hint = app.screen.query_one("#alerts-hint", Static)
+        assert "No alerts yet" in str(hint.render())
 
 
 async def test_open_modal_and_cancel_with_escape(pilot_app):
@@ -347,6 +359,9 @@ async def test_screener_custom_mode(prices_app):
     await pilot.press("s")
     filter_input = app.screen.query_one("#filter", Input)
     assert await wait_until(pilot, lambda: filter_input is not None)
+    assert app.focused is app.screen.query_one("#prices-table", DataTable)
+    await pilot.press("/")
+    assert app.focused is filter_input
     filter_input.value = "sector:technology mincap:1b sort:percentchange"
     await pilot.press("enter")
     assert await wait_until(pilot, lambda: getattr(api, "screener_search", []) != [])
@@ -423,6 +438,41 @@ async def test_prices_screen_shows_quotes(pilot_app):
     await pilot.pause()
     assert not isinstance(app.screen, PricesScreen)
     assert isinstance(app.screen, AlertListScreen)
+
+
+async def test_tab_cycles_top_level_tabs_and_alerts(prices_app):
+    app, pilot, _ = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+
+    for expected in ("g", "l", "w", "s"):
+        await pilot.press("tab")
+        assert await wait_until(pilot, lambda: app.screen.mode == expected)
+
+    await pilot.press("tab")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
+
+    await pilot.press("tab")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, PricesScreen))
+    assert app.screen.mode == "t"
+    tabs = app.screen.query_one("#mode-tabs", Tabs)
+    assert tabs.active == "t"
+    label = app.screen.query_one("#mode-label", Static)
+    assert "Top" in str(label.render())
+
+
+async def test_ctrl_right_cycles_watchlists():
+    from tui_client.settings import UserSettings
+
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD"], "crypto": ["ETH-USD"]}
+    app = AlertsApp(api=FakeApi([sample_alert("ETHUSDT")]), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        assert await wait_until(pilot, lambda: app.screen.active_watchlist == "default")
+        await pilot.press("ctrl+right")
+        assert await wait_until(pilot, lambda: app.screen.active_watchlist == "crypto")
 
 
 async def test_candles_refetch_when_cache_stale(prices_app):

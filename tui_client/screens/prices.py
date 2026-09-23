@@ -105,6 +105,9 @@ class NewWatchlistModal(ModalScreen[str | None]):
 
 
 class PricesScreen(Screen[None]):
+    TITLE = "Markets"
+    SUB_TITLE = "live quotes"
+
     BINDINGS = [
         Binding("t", "show_top", "Top"),
         Binding("g", "show_gainers", "Gainers"),
@@ -123,7 +126,8 @@ class PricesScreen(Screen[None]):
         Binding("u", "filter_up", "%UP"),
         Binding("d", "filter_down", "%DOWN"),
         Binding("n", "new_watchlist", "New list"),
-        Binding("tab", "next_watchlist", "Next list"),
+        Binding("tab", "next_list", "Next list"),
+        Binding("ctrl+right", "next_watchlist", "Next watchlist"),
         Binding("/", "focus_search", "Search", priority=True),
         Binding("escape", "focus_table", "List"),
         Binding("a", "go_alerts", "Alerts"),
@@ -266,6 +270,8 @@ class PricesScreen(Screen[None]):
         else:
             base = SCREENER_MODES[self.mode][1]
         parts = [base]
+        if self.mode == "s":
+            parts.append("/ to filter")
         if self._sort_field:
             label = dict(SORT_FIELDS.values())[self._sort_field]
             arrow = "▼" if self._sort_reverse else "▲"
@@ -320,9 +326,16 @@ class PricesScreen(Screen[None]):
             ),
             before="#prices-table",
         )
-        self.query_one("#filter", Input).focus()
+        self.query_one("#prices-table", DataTable).focus()
+
+    def activate_mode(self, mode: str) -> None:
+        """Switch to `mode`, syncing the tab bar, label and data."""
+        self._set_mode(mode)
 
     def _set_mode(self, mode: str) -> None:
+        if not self.is_mounted:
+            self.prepare_mode(mode)
+            return
         self.prepare_mode(mode)
         tabs = self.query_one("#mode-tabs", Tabs)
         if tabs.active != mode:
@@ -464,12 +477,14 @@ class PricesScreen(Screen[None]):
             self.run_worker(self.reload())
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+        if not self.is_mounted:
+            return
         tab_id = event.tab.id
         if not tab_id or tab_id == self.mode:
             return
         if tab_id == "a":
             self.query_one("#mode-tabs", Tabs).active = self.mode
-            self.app.switch_screen(self.app.alerts_screen)
+            self.app.switch_screen("alerts")
             return
         self._set_mode(tab_id)
 
@@ -506,6 +521,9 @@ class PricesScreen(Screen[None]):
         self._rebuild_table()
 
     def action_focus_search(self) -> None:
+        if self.mode == "s" and self.query("#filter"):
+            self.query_one("#filter", Input).focus()
+            return
         self.query_one("#search", Input).focus()
 
     def action_focus_table(self) -> None:
@@ -585,6 +603,18 @@ class PricesScreen(Screen[None]):
     def action_show_watchlist(self) -> None:
         self._set_mode("w")
 
+    def action_next_list(self) -> None:
+        """`tab`: advance to the next top-level tab, wrapping past Alerts."""
+        ids = [tab_id for tab_id, _ in MARKET_TABS]
+        self._activate_mode(ids[(ids.index(self.mode) + 1) % len(ids)])
+
+    def _activate_mode(self, mode: str) -> None:
+        """Switch to a top-level tab, including the Alerts screen."""
+        if mode == "a":
+            self.app.switch_screen("alerts")
+            return
+        self._set_mode(mode)
+
     def action_next_watchlist(self) -> None:
         if self.watchlist_mode != "multiple" or self.mode != "w":
             return
@@ -647,7 +677,7 @@ class PricesScreen(Screen[None]):
         self.run_worker(self.reload())
 
     def action_go_alerts(self) -> None:
-        self.app.switch_screen(self.app.alerts_screen)
+        self.app.switch_screen("alerts")
 
     def action_quit(self) -> None:
         self.app.exit()

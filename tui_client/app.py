@@ -71,6 +71,13 @@ DataTable > .datatable--hover {
     border-bottom: solid $panel;
 }
 
+#alerts-hint {
+    padding: 0 2;
+    color: $text-muted;
+    background: $surface;
+    border-bottom: solid $panel;
+}
+
 #watchlist-tabs {
     padding: 0 2;
     color: $text-muted;
@@ -152,6 +159,8 @@ class AlertsApp(App[None]):
             display=self.user.display,
         )
         self.push_screen(self.prices_screen)
+        self.install_screen(self.prices_screen, "prices")
+        self.install_screen(self.alerts_screen, "alerts")
         self.run_worker(self.monitor.run(), exclusive=True, group="price-monitor")
 
     def _on_watchlist_change(self, name: str, symbols: list[str]) -> None:
@@ -211,6 +220,7 @@ def _spawn_api(base_url: str) -> subprocess.Popen | None:
             "--port",
             str(port),
         ],
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

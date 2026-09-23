@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Tab, Tabs
+from textual.widgets import DataTable, Footer, Static, Tab, Tabs
 
 from tui_client.api import AlertApiClient, AlertView, ApiError
 from tui_client.screens.create_alert import CreateAlertModal
@@ -20,6 +20,9 @@ from tui_client.widgets import BannerHeader
 
 
 class AlertListScreen(Screen[None]):
+    TITLE = "Alerts"
+    SUB_TITLE = "price alerts"
+
     BINDINGS = [
         Binding("n", "new_alert", "New"),
         Binding("r", "refresh", "Refresh"),
@@ -27,6 +30,7 @@ class AlertListScreen(Screen[None]):
         Binding("d", "disable", "Disable"),
         Binding("x", "delete", "Delete"),
         Binding("p", "go_prices", "Prices"),
+        Binding("tab", "next_list", "Next list"),
         Binding("o", "app.settings", "Settings"),
         Binding("q", "quit", "Quit"),
     ]
@@ -45,12 +49,19 @@ class AlertListScreen(Screen[None]):
             id="mode-tabs",
         )
         yield DataTable(id="alerts-table")
+        yield Static("Loading alerts…", id="alerts-hint")
         yield Footer()
 
     def on_mount(self) -> None:
         table = self.query_one("#alerts-table", DataTable)
         table.add_columns("Symbol", "Condition", "Target", "Status", "Expires")
         table.cursor_type = "row"
+        table.focus()
+        self.notify(
+            "n new alert · tab for Top · p prices",
+            title="Alerts",
+            timeout=6,
+        )
         self.run_worker(self.reload())
 
     async def reload(self) -> None:
@@ -71,14 +82,22 @@ class AlertListScreen(Screen[None]):
                 f"[{status_color}]{alert.status}[/]",
                 alert.expires_text(),
             )
+        self.sub_title = f"{len(self._alerts)} price alert(s)"
+        hint = self.query_one("#alerts-hint", Static)
+        if self._alerts:
+            hint.update(f"{len(self._alerts)} alert(s) · n new · e/d toggle · x delete · r refresh")
+        else:
+            hint.update("No alerts yet — press n to create one")
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+        if not self.is_mounted:
+            return
         tab_id = event.tab.id
         if not tab_id or tab_id == "a":
             return
         prices = self.app.prices_screen
-        prices.prepare_mode(tab_id)
-        self.app.switch_screen(prices)
+        prices.activate_mode(tab_id)
+        self.app.switch_screen("prices")
 
     def action_new_alert(self) -> None:
         display = getattr(self.app.user, "display", None)
@@ -139,7 +158,13 @@ class AlertListScreen(Screen[None]):
         await self.reload()
 
     def action_go_prices(self) -> None:
-        self.app.switch_screen(self.app.prices_screen)
+        self.app.switch_screen("prices")
+
+    def action_next_list(self) -> None:
+        """`tab`: leave Alerts and wrap to the first top-level tab."""
+        prices = self.app.prices_screen
+        prices.activate_mode("t")
+        self.app.switch_screen("prices")
 
     def action_quit(self) -> None:
         self.app.exit()
