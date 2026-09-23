@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>coderkrow — Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    /* ─── Tokens ──────────────────────────────────────────── */
+    :root {
+      --ck-ink:         #1d1d1b;
+      --ck-teal:        #1a595a;
+      --ck-teal-mid:    #2e7f80;
+      --ck-teal-light:  #3bb8ba;
+      --ck-cyan:        #00d1d4;
+      --ck-surface:     #f5f4f0;
+      --ck-muted:       #4a4a47;
+
+      --ck-bg:          #ffffff;
+      --ck-border:      rgba(29,29,27,.08);
+      --ck-border-brand: rgba(26,89,90,.2);
+
+      --ck-font:        "Space Grotesk", "Outfit", sans-serif;
+      --ck-mono:        "JetBrains Mono", "Fira Code", monospace;
+
+      --ck-space-1:  4px;
+      --ck-space-2:  8px;
+      --ck-space-3:  12px;
+      --ck-space-4:  16px;
+      --ck-space-6:  24px;
+      --ck-space-8:  32px;
+      --ck-space-12: 48px;
+      --ck-space-16: 64px;
+
+      --ck-r-xs:   2px;
+      --ck-r-sm:   4px;
+      --ck-r-md:   8px;
+      --ck-r-lg:  10px;
+      --ck-r-xl:  12px;
+      --ck-r-full: 9999px;
+
+      color-scheme: light dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --ck-bg:      #111110;
+        --ck-surface: #1a1a18;
+        --ck-ink:     #e8e6df;
+        --ck-muted:   #888780;
+        --ck-border:  rgba(232,230,223,.07);
+      }
+    }
+    :root[data-theme="dark"] {
+      --ck-bg:      #111110;
+      --ck-surface: #1a1a18;
+      --ck-ink:     #e8e6df;
+      --ck-muted:   #888780;
+      --ck-border:  rgba(232,230,223,.07);
+    }
+
+    /* ─── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-family: var(--ck-font); font-size: 15px; color: var(--ck-ink); background: var(--ck-bg); -webkit-font-smoothing: antialiased; transition: background 200ms, color 200ms; }
+    body { min-height: 100vh; }
+
+    /* ─── Theme toggle ────────────────────────────────────── */
+    .theme-toggle {
+      display: flex; align-items: center; gap: 2px;
+      background: var(--ck-surface); border: 1px solid var(--ck-border);
+      border-radius: var(--ck-r-full); padding: 2px; margin-left: auto;
+    }
+    .theme-btn {
+      font-family: var(--ck-font); font-size: 12px; font-weight: 500;
+      background: none; border: none; cursor: pointer; color: var(--ck-muted);
+      padding: 5px 12px; border-radius: var(--ck-r-full);
+      transition: background 150ms, color 150ms;
+    }
+    .theme-btn.active { background: var(--ck-teal); color: #fff; }
+
+    /* ─── Layout ──────────────────────────────────────────── */
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 var(--ck-space-6); }
+
+    /* ─── Nav / header ────────────────────────────────────── */
+    .site-header {
+      position: sticky; top: 0; z-index: 100;
+      border-bottom: 1px solid var(--ck-border);
+      background: var(--ck-bg);
+      padding: 0 var(--ck-space-6);
+    }
+    .header-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; align-items: center; gap: var(--ck-space-8);
+      height: 52px;
+    }
+    .wordmark { font-size: 20px; font-weight: 400; letter-spacing: -0.01em; line-height: 1; text-decoration: none; flex-shrink: 0; }
+    .wordmark .coder { color: var(--ck-ink); }
+    .wordmark .krow  { color: var(--ck-teal); }
+
+    /* ─── Tabs ────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 2px; flex: 1; }
+    .tab-btn {
+      font-family: var(--ck-font); font-size: 13px; font-weight: 500;
+      color: var(--ck-muted); background: none; border: none; cursor: pointer;
+      padding: 6px 14px; border-radius: var(--ck-r-md);
+      transition: color 150ms, background 150ms;
+    }
+    .tab-btn:hover { color: var(--ck-ink); }
+    .tab-btn.active { color: var(--ck-teal); background: rgba(26,89,90,.08); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ─── Section structure ───────────────────────────────── */
+    .section { padding: var(--ck-space-12) 0; border-bottom: 1px solid var(--ck-border); }
+    .section:last-child { border-bottom: none; }
+    .section-label {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--ck-muted);
+      margin-bottom: var(--ck-space-6);
+    }
+    .section-title { font-size: 28px; font-weight: 500; letter-spacing: -0.015em; margin-bottom: var(--ck-space-8); }
+
+    /* ─── Color palette ───────────────────────────────────── */
+    .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--ck-space-3); }
+    .swatch-card {
+      border: 1px solid var(--ck-border); border-radius: var(--ck-r-lg);
+      overflow: hidden; transition: border-color 150ms;
+    }
+    .swatch-card:hover { border-color: var(--ck-border-brand); }
+    .swatch-color { height: 64px; }
+    .swatch-info { padding: 10px 12px; }
+    .swatch-name { font-size: 12px; font-weight: 500; color: var(--ck-ink); margin-bottom: 2px; }
+    .swatch-hex  { font-family: var(--ck-mono); font-size: 11px; color: var(--ck-muted); }
+    .swatch-role { font-size: 11px; color: var(--ck-muted); margin-top: 4px; line-height: 1.4; }
+
+    .color-ratio { display: flex; height: 12px; border-radius: var(--ck-r-full); overflow: hidden; margin-top: var(--ck-space-6); }
+    .ratio-seg { transition: flex 600ms ease; }
+
+    /* ─── Typography ──────────────────────────────────────── */
+    .type-scale { display: flex; flex-direction: column; gap: var(--ck-space-2); }
+    .type-row {
+      display: flex; align-items: baseline; gap: var(--ck-space-6);
+      padding: var(--ck-space-3) 0; border-bottom: 1px solid var(--ck-border);
+    }
+    .type-row:last-child { border-bottom: none; }
+    .type-meta { min-width: 120px; flex-shrink: 0; }
+    .type-token  { font-family: var(--ck-mono); font-size: 11px; color: var(--ck-teal); display: block; margin-bottom: 2px; }
+    .type-spec   { font-size: 11px; color: var(--ck-muted); }
+    .type-preview { flex: 1; overflow: hidden; }
+
+    /* ─── Spacing ─────────────────────────────────────────── */
+    .spacing-grid { display: flex; flex-direction: column; gap: var(--ck-space-3); }
+    .space-row { display: flex; align-items: center; gap: var(--ck-space-4); }
+    .space-bar { height: 10px; background: rgba(26,89,90,.25); border-radius: var(--ck-r-xs); flex-shrink: 0; }
+    .space-meta { font-family: var(--ck-mono); font-size: 12px; color: var(--ck-muted); }
+
+    /* ─── Border radius ───────────────────────────────────── */
+    .radius-row { display: flex; gap: var(--ck-space-4); flex-wrap: wrap; align-items: flex-end; }
+    .radius-chip { text-align: center; }
+    .radius-box { width: 52px; height: 52px; background: rgba(26,89,90,.12); border: 1px solid var(--ck-border-brand); }
+    .radius-label { font-family: var(--ck-mono); font-size: 10px; color: var(--ck-muted); margin-top: 6px; line-height: 1.5; }
+
+    /* ─── Component demos ─────────────────────────────────── */
+    .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ck-space-6); }
+    @media (max-width: 640px) { .comp-grid { grid-template-columns: 1fr; } }
+    .comp-block { display: flex; flex-direction: column; gap: var(--ck-space-3); }
+    .comp-block-label { font-size: 11px; font-weight: 500; color: var(--ck-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--ck-space-1); }
+
+    /* Buttons */
+    .btn {
+      font-family: var(--ck-font); font-size: 14px; font-weight: 500;
+      padding: 10px 20px; border-radius: var(--ck-r-md); cursor: pointer;
+      transition: background 150ms, color 150ms, border-color 150ms, transform 150ms;
+      display: inline-block; text-align: center; border: 1px solid transparent;
+    }
+    .btn-primary { background: var(--ck-teal); color: #fff; }
+    .btn-primary:hover { background: var(--ck-teal-mid); }
+    .btn-secondary { background: transparent; border-color: var(--ck-teal); color: var(--ck-teal); }
+    .btn-secondary:hover { background: rgba(26,89,90,.08); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--ck-muted); }
+    .btn-ghost:hover { color: var(--ck-ink); }
+
+    /* Tags */
+    .tag {
+      display: inline-block; font-family: var(--ck-font); font-size: 12px; font-weight: 500;
+      padding: 3px 10px; border-radius: var(--ck-r-full); border: 1px solid; line-height: 1.6;
+      transition: background 150ms, border-color 150ms, color 150ms;
+    }
+    .tag-default { background: var(--ck-surface); border-color: rgba(29,29,27,.1); color: var(--ck-muted); }
+    .tag-brand   { background: rgba(26,89,90,.1); border-color: rgba(26,89,90,.2); color: var(--ck-teal); }
+    .tag-cyan    { background: rgba(0,209,212,.1); border-color: rgba(0,209,212,.2); color: var(--ck-teal); }
+    .tags-row    { display: flex; gap: var(--ck-space-2); flex-wrap: wrap; }
+
+    /* Card */
+    .demo-card {
+      background: var(--ck-surface); border: 1px solid var(--ck-border);
+      border-radius: var(--ck-r-lg); padding: var(--ck-space-6);
+      transition: border-color 150ms;
+    }
+    .demo-card:hover { border-color: var(--ck-border-brand); }
+    .demo-card-title { font-size: 16px; font-weight: 500; margin-bottom: var(--ck-space-2); }
+    .demo-card-body  { font-size: 14px; color: var(--ck-muted); line-height: 1.65; }
+    .demo-card-meta  { font-size: 12px; color: var(--ck-muted); margin-top: var(--ck-space-4); display: flex; gap: var(--ck-space-3); align-items: center; }
+
+    /* Inline code */
+    code {
+      font-family: var(--ck-mono); font-size: 0.9em;
+      background: rgba(26,89,90,.08); color: var(--ck-teal);
+      border-radius: 3px; padding: 1px 5px;
+    }
+
+    /* Code block */
+    .code-block {
+      background: #111110; border-radius: var(--ck-r-md);
+      padding: 20px 24px; overflow-x: auto;
+    }
+    .code-block pre { font-family: var(--ck-mono); font-size: 13px; line-height: 1.6; }
+    .ck  { color: #e8e6df; }
+    .kw  { color: #00d1d4; }
+    .str { color: #3bb8ba; }
+    .cm  { color: #888780; }
+    .vr  { color: #a8c4c4; }
+    .pn  { color: rgba(232,230,223,.3); }
+
+    /* Nav demo */
+    .nav-demo {
+      border: 1px solid var(--ck-border); border-radius: var(--ck-r-lg);
+      padding: 0 var(--ck-space-6); display: flex; align-items: center;
+      gap: var(--ck-space-6); height: 48px;
+    }
+    .nav-demo-links { display: flex; gap: var(--ck-space-4); }
+    .nav-link { font-size: 13px; font-weight: 500; color: var(--ck-muted); text-decoration: none; transition: color 150ms; }
+    .nav-link:hover, .nav-link.active { color: var(--ck-teal); }
+
+    /* ─── CSS export block ────────────────────────────────── */
+    .token-export { border: 1px solid var(--ck-border); border-radius: var(--ck-r-lg); overflow: hidden; }
+    .token-export-header {
+      padding: var(--ck-space-3) var(--ck-space-6);
+      background: var(--ck-surface); border-bottom: 1px solid var(--ck-border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .token-export-label { font-size: 12px; font-weight: 500; color: var(--ck-muted); }
+    .copy-btn {
+      font-family: var(--ck-font); font-size: 12px; font-weight: 500;
+      color: var(--ck-teal); background: none; border: 1px solid var(--ck-border-brand);
+      border-radius: var(--ck-r-sm); padding: 3px 10px; cursor: pointer;
+      transition: background 150ms;
+    }
+    .copy-btn:hover { background: rgba(26,89,90,.08); }
+    .token-export .code-block { border-radius: 0; }
+
+    /* ─── Brand Rules tab ─────────────────────────────────── */
+    .rules-layout { display: grid; grid-template-columns: 200px 1fr; gap: var(--ck-space-8); align-items: start; padding: var(--ck-space-12) 0; }
+    @media (max-width: 800px) { .rules-layout { grid-template-columns: 1fr; } }
+
+    .rules-toc { position: sticky; top: 68px; }
+    .rules-toc-label { font-size: 11px; font-weight: 500; color: var(--ck-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: var(--ck-space-3); }
+    .toc-link {
+      display: block; font-size: 13px; color: var(--ck-muted);
+      text-decoration: none; padding: 4px 0; transition: color 150ms;
+      border-left: 2px solid transparent; padding-left: 12px; margin-left: -12px;
+    }
+    .toc-link:hover { color: var(--ck-teal); }
+    .toc-link.active { color: var(--ck-teal); border-left-color: var(--ck-teal); }
+
+    .rules-body { min-width: 0; }
+    .rules-section { margin-bottom: var(--ck-space-12); }
+    .rules-section:last-child { margin-bottom: 0; }
+
+    .rules-h2 {
+      font-size: 22px; font-weight: 500; letter-spacing: -0.01em;
+      color: var(--ck-ink); margin-bottom: var(--ck-space-6);
+      padding-bottom: var(--ck-space-3);
+      border-bottom: 1px solid var(--ck-border);
+      scroll-margin-top: 72px;
+    }
+    .rules-h3 { font-size: 16px; font-weight: 500; color: var(--ck-ink); margin: var(--ck-space-6) 0 var(--ck-space-3); }
+    .rules-p  { font-size: 15px; color: var(--ck-muted); line-height: 1.65; margin-bottom: var(--ck-space-4); }
+    .rules-p strong { color: var(--ck-ink); font-weight: 500; }
+    .rules-ul { list-style: none; padding: 0; margin-bottom: var(--ck-space-4); }
+    .rules-ul li {
+      font-size: 15px; color: var(--ck-muted); line-height: 1.65;
+      padding: 4px 0 4px 16px; position: relative;
+    }
+    .rules-ul li::before {
+      content: '—'; position: absolute; left: 0;
+      color: var(--ck-teal); font-size: 12px; top: 6px;
+    }
+    .rules-ul li strong { color: var(--ck-ink); font-weight: 500; }
+
+    .rules-blockquote {
+      border-left: 3px solid var(--ck-teal); margin: var(--ck-space-6) 0;
+      padding: var(--ck-space-3) var(--ck-space-4);
+      background: rgba(26,89,90,.05); border-radius: 0 var(--ck-r-sm) var(--ck-r-sm) 0;
+    }
+    .rules-blockquote p { font-size: 14px; color: var(--ck-muted); margin: 0; }
+
+    .rules-table { width: 100%; border-collapse: collapse; margin-bottom: var(--ck-space-6); font-size: 13px; }
+    .rules-table th {
+      text-align: left; font-size: 11px; font-weight: 500; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--ck-muted);
+      padding: var(--ck-space-2) var(--ck-space-3);
+      border-bottom: 1px solid var(--ck-border);
+    }
+    .rules-table td {
+      padding: var(--ck-space-2) var(--ck-space-3);
+      border-bottom: 1px solid var(--ck-border);
+      color: var(--ck-muted); vertical-align: top; line-height: 1.5;
+    }
+    .rules-table td:first-child { color: var(--ck-ink); font-weight: 500; }
+    .rules-table tr:last-child td { border-bottom: none; }
+
+    .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ck-space-3); margin-bottom: var(--ck-space-6); }
+    @media (max-width: 640px) { .do-dont { grid-template-columns: 1fr; } }
+    .do-col, .dont-col { border: 1px solid; border-radius: var(--ck-r-md); overflow: hidden; }
+    .do-col   { border-color: rgba(26,89,90,.25); }
+    .dont-col { border-color: rgba(200,60,60,.2); }
+    .do-header, .dont-header {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: var(--ck-space-2) var(--ck-space-4);
+    }
+    .do-header   { background: rgba(26,89,90,.08); color: var(--ck-teal); }
+    .dont-header { background: rgba(200,60,60,.07); color: #c83c3c; }
+    .do-list, .dont-list { list-style: none; padding: var(--ck-space-3) var(--ck-space-4); display: flex; flex-direction: column; gap: 6px; }
+    .do-list li, .dont-list li { font-size: 13px; color: var(--ck-muted); line-height: 1.5; }
+
+    .prohibited-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--ck-space-2); }
+    .prohibited-list li {
+      display: flex; align-items: center; gap: var(--ck-space-3);
+      font-size: 14px; color: var(--ck-muted); padding: var(--ck-space-2) 0;
+      border-bottom: 1px solid var(--ck-border);
+    }
+    .prohibited-list li:last-child { border-bottom: none; }
+    .prohibited-num { font-family: var(--ck-mono); font-size: 11px; color: var(--ck-muted); min-width: 20px; }
+
+    .rules-code {
+      background: #111110; border-radius: var(--ck-r-md);
+      padding: 16px 20px; overflow-x: auto; margin: var(--ck-space-4) 0;
+    }
+    .rules-code pre { font-family: var(--ck-mono); font-size: 13px; line-height: 1.6; color: #e8e6df; }
+
+    /* Divider */
+    .divider { border: none; border-top: 1px solid var(--ck-border); margin: var(--ck-space-8) 0; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="wordmark">
+        <span class="coder">coder</span><span class="krow">krow</span>
+      </a>
+      <nav class="tabs" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="tokens">Design tokens</button>
+        <button class="tab-btn" role="tab" data-tab="rules">Agent rules</button>
+      </nav>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button class="theme-btn" data-theme-choice="light">Light</button>
+        <button class="theme-btn" data-theme-choice="dark">Dark</button>
+        <button class="theme-btn" data-theme-choice="system">Auto</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════
+       TAB 1 — DESIGN TOKENS
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="tab-tokens" class="tab-panel active">
+    <div class="wrap">
+
+      <!-- Color ────────────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">01 — Color</p>
+        <h2 class="section-title">Palette</h2>
+        <div class="palette-grid">
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#1d1d1b;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-ink</div>
+              <div class="swatch-hex">#1d1d1b</div>
+              <div class="swatch-role">Primary text, heavy UI</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#1a595a;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-teal</div>
+              <div class="swatch-hex">#1a595a</div>
+              <div class="swatch-role">"krow" wordmark, brand accent</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#2e7f80;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-teal-mid</div>
+              <div class="swatch-hex">#2e7f80</div>
+              <div class="swatch-role">Hover states, interactive</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#3bb8ba;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-teal-light</div>
+              <div class="swatch-hex">#3bb8ba</div>
+              <div class="swatch-role">Badges, code strings</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#00d1d4;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-cyan</div>
+              <div class="swatch-hex">#00d1d4</div>
+              <div class="swatch-role">Signal / goggle cyan</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#f5f4f0; border-bottom: 1px solid rgba(0,0,0,.06);"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-surface</div>
+              <div class="swatch-hex">#f5f4f0</div>
+              <div class="swatch-role">Cards, inputs (light mode)</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#4a4a47;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-muted</div>
+              <div class="swatch-hex">#4a4a47</div>
+              <div class="swatch-role">Secondary text, captions</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#111110;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-bg (dark)</div>
+              <div class="swatch-hex">#111110</div>
+              <div class="swatch-role">Dark mode base, code bg</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="rules-h3" style="margin-top:var(--ck-space-8)">Color ratio</h3>
+        <p style="font-size:13px; color:var(--ck-muted); margin-bottom:var(--ck-space-3)">Approximate distribution per section/page:</p>
+        <div class="color-ratio">
+          <div class="ratio-seg" style="flex:70; background:var(--ck-surface); border:1px solid var(--ck-border); border-right:none;" title="70% — background"></div>
+          <div class="ratio-seg" style="flex:20; background:var(--ck-ink);" title="20% — ink elements"></div>
+          <div class="ratio-seg" style="flex:8;  background:var(--ck-teal);" title="8% — teal accents"></div>
+          <div class="ratio-seg" style="flex:2;  background:var(--ck-cyan);" title="2% — cyan highlights"></div>
+        </div>
+        <div style="display:flex; gap:var(--ck-space-6); margin-top:var(--ck-space-3);">
+          <span style="font-size:12px; color:var(--ck-muted)">70% bg</span>
+          <span style="font-size:12px; color:var(--ck-muted)">20% ink</span>
+          <span style="font-size:12px; color:var(--ck-muted)">8% teal</span>
+          <span style="font-size:12px; color:var(--ck-muted)">2% cyan</span>
+        </div>
+
+        <h3 class="rules-h3" style="margin-top:var(--ck-space-8)">Dark mode overrides</h3>
+        <div class="palette-grid">
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#111110;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-bg</div>
+              <div class="swatch-hex">#111110</div>
+              <div class="swatch-role">Dark base — not pure black</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#1a1a18;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-surface</div>
+              <div class="swatch-hex">#1a1a18</div>
+              <div class="swatch-role">Dark card / input surface</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#e8e6df;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-ink</div>
+              <div class="swatch-hex">#e8e6df</div>
+              <div class="swatch-role">Warm off-white text</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-color" style="background:#888780;"></div>
+            <div class="swatch-info">
+              <div class="swatch-name">--ck-muted</div>
+              <div class="swatch-hex">#888780</div>
+              <div class="swatch-role">Secondary (dark mode)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typography ───────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">02 — Typography</p>
+        <h2 class="section-title">Type scale</h2>
+
+        <div class="palette-grid" style="margin-bottom:var(--ck-space-8);">
+          <div class="swatch-card">
+            <div class="swatch-info" style="padding:var(--ck-space-4);">
+              <div style="font-family:'Space Grotesk',sans-serif; font-size:22px; margin-bottom:6px;">Aa Bb Cc</div>
+              <div class="swatch-name">--ck-font-display / --ck-font-body</div>
+              <div class="swatch-hex">Space Grotesk</div>
+              <div class="swatch-role">Primary — display &amp; body</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-info" style="padding:var(--ck-space-4);">
+              <div style="font-family:'Outfit',sans-serif; font-size:22px; margin-bottom:6px;">Aa Bb Cc</div>
+              <div class="swatch-name">fallback</div>
+              <div class="swatch-hex">Outfit</div>
+              <div class="swatch-role">Fallback for Space Grotesk</div>
+            </div>
+          </div>
+          <div class="swatch-card">
+            <div class="swatch-info" style="padding:var(--ck-space-4);">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:20px; margin-bottom:6px;">Aa Bb 01</div>
+              <div class="swatch-name">--ck-font-mono</div>
+              <div class="swatch-hex">JetBrains Mono</div>
+              <div class="swatch-role">Required — all code</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="type-scale">
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-display</span>
+              <span class="type-spec">64px · 400 · -0.02em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:clamp(32px,5vw,64px); font-weight:400; letter-spacing:-0.02em; line-height:1; color:var(--ck-ink)"><span style="color:var(--ck-ink)">coder</span><span style="color:var(--ck-teal)">krow</span></span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-h1</span>
+              <span class="type-spec">40px · 500 · -0.02em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:clamp(24px,3.5vw,40px); font-weight:500; letter-spacing:-0.02em; line-height:1.1; color:var(--ck-ink)">Building in public</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-h2</span>
+              <span class="type-spec">28px · 500 · -0.015em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:28px; font-weight:500; letter-spacing:-0.015em; line-height:1.2; color:var(--ck-ink)">Why I rewrote it in Rust</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-h3</span>
+              <span class="type-spec">20px · 500 · -0.01em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:20px; font-weight:500; letter-spacing:-0.01em; color:var(--ck-ink)">The parts of Astro no one talks about</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-body-lg</span>
+              <span class="type-spec">18px · 400 · 0em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:18px; font-weight:400; color:var(--ck-muted); line-height:1.65">Lead paragraph copy. LATAM devs building real things in production; not toy projects, not tutorials with fake data.</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-body</span>
+              <span class="type-spec">15px · 400 · 0em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:15px; font-weight:400; color:var(--ck-muted); line-height:1.65">Standard body copy. Short sentences; commas and semicolons for rhythm. No em dashes. Optimized for short attention spans.</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-small</span>
+              <span class="type-spec">13px · 400 · 0.01em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:13px; font-weight:400; color:var(--ck-muted); letter-spacing:0.01em">Jun 29, 2026 · 8 min read · 12.4K views</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-label</span>
+              <span class="type-spec">11px · 500 · 0.08em · Space Grotesk</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-size:11px; font-weight:500; color:var(--ck-teal); letter-spacing:0.08em; text-transform:uppercase">Astro · TypeScript · Web performance</span>
+            </div>
+          </div>
+          <div class="type-row">
+            <div class="type-meta">
+              <span class="type-token">text-code</span>
+              <span class="type-spec">14px · 400 · 0em · JetBrains Mono</span>
+            </div>
+            <div class="type-preview">
+              <span style="font-family:var(--ck-mono); font-size:14px; color:var(--ck-ink)">const route = getStaticPaths();</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spacing ──────────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">03 — Spacing</p>
+        <h2 class="section-title">8px base scale</h2>
+        <div class="spacing-grid">
+          <div class="space-row"><div class="space-bar" style="width:4px;"></div><span class="space-meta">--ck-space-1 · 4px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:8px;"></div><span class="space-meta">--ck-space-2 · 8px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:12px;"></div><span class="space-meta">--ck-space-3 · 12px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:16px;"></div><span class="space-meta">--ck-space-4 · 16px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:20px;"></div><span class="space-meta">--ck-space-5 · 20px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:24px;"></div><span class="space-meta">--ck-space-6 · 24px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:32px;"></div><span class="space-meta">--ck-space-8 · 32px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:48px;"></div><span class="space-meta">--ck-space-12 · 48px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:64px;"></div><span class="space-meta">--ck-space-16 · 64px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:96px;"></div><span class="space-meta">--ck-space-24 · 96px</span></div>
+          <div class="space-row"><div class="space-bar" style="width:128px;"></div><span class="space-meta">--ck-space-32 · 128px</span></div>
+        </div>
+      </div>
+
+      <!-- Border radius ────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">04 — Border radius</p>
+        <h2 class="section-title">Radius scale</h2>
+        <div class="radius-row">
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:2px;"></div>
+            <div class="radius-label">--ck-r-xs<br>2px</div>
+          </div>
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:4px;"></div>
+            <div class="radius-label">--ck-r-sm<br>4px</div>
+          </div>
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:8px;"></div>
+            <div class="radius-label">--ck-r-md<br>8px</div>
+          </div>
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:10px;"></div>
+            <div class="radius-label">--ck-r-lg<br>10px</div>
+          </div>
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:12px;"></div>
+            <div class="radius-label">--ck-r-xl<br>12px</div>
+          </div>
+          <div class="radius-chip">
+            <div class="radius-box" style="border-radius:9999px;"></div>
+            <div class="radius-label">--ck-r-full<br>9999px</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Components ───────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">05 — Components</p>
+        <h2 class="section-title">Component demos</h2>
+
+        <div class="comp-grid">
+          <!-- Buttons -->
+          <div class="comp-block">
+            <div class="comp-block-label">Buttons</div>
+            <div><button class="btn btn-primary">Watch now</button></div>
+            <div><button class="btn btn-secondary">See all videos</button></div>
+            <div><button class="btn btn-ghost">Browse by topic</button></div>
+          </div>
+
+          <!-- Tags -->
+          <div class="comp-block">
+            <div class="comp-block-label">Tags &amp; Badges</div>
+            <div class="tags-row">
+              <span class="tag tag-default">astro</span>
+              <span class="tag tag-default">typescript</span>
+              <span class="tag tag-default">web-performance</span>
+            </div>
+            <div class="tags-row">
+              <span class="tag tag-brand">rust</span>
+              <span class="tag tag-brand">fullstack</span>
+            </div>
+            <div class="tags-row">
+              <span class="tag tag-cyan">new</span>
+              <span class="tag tag-cyan">live</span>
+            </div>
+          </div>
+
+          <!-- Card -->
+          <div class="comp-block" style="grid-column: 1 / -1;">
+            <div class="comp-block-label">Card</div>
+            <div class="demo-card">
+              <div class="demo-card-title">Why I rewrote the router in Rust</div>
+              <div class="demo-card-body">Three months of Go in production taught me exactly one thing. The bottleneck was never where I thought it was.</div>
+              <div class="demo-card-meta">
+                <span class="tag tag-brand" style="font-size:11px; padding:2px 8px;">rust</span>
+                <span class="tag tag-default" style="font-size:11px; padding:2px 8px;">systems</span>
+                <span style="margin-left:auto; font-size:12px; color:var(--ck-muted);">Jun 29, 2026 · 8 min read</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nav -->
+          <div class="comp-block" style="grid-column: 1 / -1;">
+            <div class="comp-block-label">Navigation</div>
+            <div class="nav-demo">
+              <a href="#" class="wordmark" style="font-size:16px;">
+                <span class="coder">coder</span><span class="krow">krow</span>
+              </a>
+              <nav class="nav-demo-links">
+                <a href="#" class="nav-link active">videos</a>
+                <a href="#" class="nav-link">posts</a>
+                <a href="#" class="nav-link">projects</a>
+              </nav>
+              <div style="margin-left:auto;"><button class="btn btn-secondary" style="padding:6px 14px; font-size:13px;">Discord</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Code block -->
+        <div style="margin-top:var(--ck-space-6);">
+          <div class="comp-block-label">Code block (always dark)</div>
+          <div class="code-block" style="margin-top:var(--ck-space-3);">
+            <pre><span class="cm">// Astro + Cloudflare KV — session helper</span>
+<span class="kw">export async function</span> <span class="ck">getSession</span><span class="pn">(</span><span class="vr">kv</span><span class="pn">:</span> <span class="str">KVNamespace</span><span class="pn">,</span> <span class="vr">token</span><span class="pn">:</span> <span class="str">string</span><span class="pn">) {</span>
+  <span class="kw">const</span> <span class="vr">raw</span> <span class="pn">=</span> <span class="kw">await</span> <span class="vr">kv</span><span class="pn">.</span><span class="ck">get</span><span class="pn">(</span><span class="str">`session:${<span class="vr">token</span>}`</span><span class="pn">);</span>
+  <span class="kw">if</span> <span class="pn">(!</span><span class="vr">raw</span><span class="pn">)</span> <span class="kw">return null</span><span class="pn">;</span>
+  <span class="kw">return</span> <span class="ck">JSON.parse</span><span class="pn">(</span><span class="vr">raw</span><span class="pn">);</span>
+<span class="pn">}</span></pre>
+          </div>
+          <div style="margin-top:var(--ck-space-3); font-size:14px; color:var(--ck-muted);">
+            Inline: use <code>getStaticPaths()</code> to pre-render all routes at build time.
+          </div>
+        </div>
+      </div>
+
+      <!-- CSS export ───────────────────────────────────────── -->
+      <div class="section">
+        <p class="section-label">06 — CSS export</p>
+        <h2 class="section-title">Custom properties</h2>
+        <div class="token-export">
+          <div class="token-export-header">
+            <span class="token-export-label">tokens.css — drop into :root</span>
+            <button class="copy-btn" onclick="copyTokens(this)">Copy</button>
+          </div>
+          <div class="code-block">
+            <pre id="token-css"><span class="cm">/* coderkrow design tokens v1 */</span>
+<span class="kw">:root</span> <span class="pn">{</span>
+  <span class="cm">/* Color */</span>
+  <span class="vr">--ck-ink</span><span class="pn">:</span>         <span class="str">#1d1d1b</span><span class="pn">;</span>
+  <span class="vr">--ck-teal</span><span class="pn">:</span>        <span class="str">#1a595a</span><span class="pn">;</span>
+  <span class="vr">--ck-teal-mid</span><span class="pn">:</span>    <span class="str">#2e7f80</span><span class="pn">;</span>
+  <span class="vr">--ck-teal-light</span><span class="pn">:</span>  <span class="str">#3bb8ba</span><span class="pn">;</span>
+  <span class="vr">--ck-cyan</span><span class="pn">:</span>        <span class="str">#00d1d4</span><span class="pn">;</span>
+  <span class="vr">--ck-surface</span><span class="pn">:</span>     <span class="str">#f5f4f0</span><span class="pn">;</span>
+  <span class="vr">--ck-muted</span><span class="pn">:</span>       <span class="str">#4a4a47</span><span class="pn">;</span>
+  <span class="vr">--ck-bg</span><span class="pn">:</span>          <span class="str">#ffffff</span><span class="pn">;</span>
+
+  <span class="cm">/* Typography */</span>
+  <span class="vr">--ck-font</span><span class="pn">:</span>   <span class="str">"Space Grotesk", "Outfit", sans-serif</span><span class="pn">;</span>
+  <span class="vr">--ck-mono</span><span class="pn">:</span>   <span class="str">"JetBrains Mono", "Fira Code", monospace</span><span class="pn">;</span>
+
+  <span class="cm">/* Spacing */</span>
+  <span class="vr">--ck-space-1</span><span class="pn">:</span>   <span class="str">4px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-2</span><span class="pn">:</span>   <span class="str">8px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-3</span><span class="pn">:</span>   <span class="str">12px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-4</span><span class="pn">:</span>   <span class="str">16px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-5</span><span class="pn">:</span>   <span class="str">20px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-6</span><span class="pn">:</span>   <span class="str">24px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-8</span><span class="pn">:</span>   <span class="str">32px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-12</span><span class="pn">:</span>  <span class="str">48px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-16</span><span class="pn">:</span>  <span class="str">64px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-24</span><span class="pn">:</span>  <span class="str">96px</span><span class="pn">;</span>
+  <span class="vr">--ck-space-32</span><span class="pn">:</span>  <span class="str">128px</span><span class="pn">;</span>
+
+  <span class="cm">/* Border radius */</span>
+  <span class="vr">--ck-r-xs</span><span class="pn">:</span>   <span class="str">2px</span><span class="pn">;</span>
+  <span class="vr">--ck-r-sm</span><span class="pn">:</span>   <span class="str">4px</span><span class="pn">;</span>
+  <span class="vr">--ck-r-md</span><span class="pn">:</span>   <span class="str">8px</span><span class="pn">;</span>
+  <span class="vr">--ck-r-lg</span><span class="pn">:</span>   <span class="str">10px</span><span class="pn">;</span>
+  <span class="vr">--ck-r-xl</span><span class="pn">:</span>   <span class="str">12px</span><span class="pn">;</span>
+  <span class="vr">--ck-r-full</span><span class="pn">:</span> <span class="str">9999px</span><span class="pn">;</span>
+<span class="pn">}</span>
+
+<span class="kw">@media</span> <span class="pn">(</span><span class="str">prefers-color-scheme: dark</span><span class="pn">) {</span>
+  <span class="kw">:root</span><span class="pn">:not([</span><span class="str">data-theme="light"</span><span class="pn">]) {</span>
+    <span class="vr">--ck-bg</span><span class="pn">:</span>      <span class="str">#111110</span><span class="pn">;</span>
+    <span class="vr">--ck-surface</span><span class="pn">:</span> <span class="str">#1a1a18</span><span class="pn">;</span>
+    <span class="vr">--ck-ink</span><span class="pn">:</span>     <span class="str">#e8e6df</span><span class="pn">;</span>
+    <span class="vr">--ck-muted</span><span class="pn">:</span>   <span class="str">#888780</span><span class="pn">;</span>
+  <span class="pn">}</span>
+<span class="pn">}</span>
+<span class="cm">/* manual toggle override */</span>
+<span class="kw">:root</span><span class="pn">[</span><span class="str">data-theme="dark"</span><span class="pn">] {</span>
+  <span class="vr">--ck-bg</span><span class="pn">:</span>      <span class="str">#111110</span><span class="pn">;</span>
+  <span class="vr">--ck-surface</span><span class="pn">:</span> <span class="str">#1a1a18</span><span class="pn">;</span>
+  <span class="vr">--ck-ink</span><span class="pn">:</span>     <span class="str">#e8e6df</span><span class="pn">;</span>
+  <span class="vr">--ck-muted</span><span class="pn">:</span>   <span class="str">#888780</span><span class="pn">;</span>
+<span class="pn">}</span></pre>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /wrap -->
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       TAB 2 — AGENT RULES
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="tab-rules" class="tab-panel">
+    <div class="wrap">
+      <div class="rules-layout">
+
+        <!-- ToC -->
+        <aside class="rules-toc">
+          <div class="rules-toc-label">Sections</div>
+          <a href="#r1"  class="toc-link active">1. Identity</a>
+          <a href="#r2"  class="toc-link">2. Color</a>
+          <a href="#r3"  class="toc-link">3. Typography</a>
+          <a href="#r4"  class="toc-link">4. Spacing</a>
+          <a href="#r5"  class="toc-link">5. Components</a>
+          <a href="#r6"  class="toc-link">6. Iconography</a>
+          <a href="#r7"  class="toc-link">7. Imagery</a>
+          <a href="#r8"  class="toc-link">8. Animation</a>
+          <a href="#r9"  class="toc-link">9. Voice</a>
+          <a href="#r10" class="toc-link">10. Do / Don't</a>
+          <a href="#r11" class="toc-link">11. Prohibited</a>
+        </aside>
+
+        <!-- Body -->
+        <main class="rules-body">
+
+          <div class="rules-blockquote" style="margin-bottom:var(--ck-space-8)">
+            <p>These rules govern all AI-generated page content and designs for the coderkrow website. Follow every rule strictly. When in doubt, refer back to the source of truth: the imagotipo (mascot + wordmark lockup).</p>
+          </div>
+
+          <!-- §1 Identity -->
+          <div class="rules-section" id="r1">
+            <h2 class="rules-h2">1. Identity principles</h2>
+            <p class="rules-p">coderkrow is a tech content brand for developers; not a SaaS product, not a corporate entity. The visual language must feel <strong>crafted, opinionated, and slightly dark</strong> — like a developer who cares deeply about aesthetics.</p>
+            <h3 class="rules-h3">Core traits to express in every design</h3>
+            <ul class="rules-ul">
+              <li><strong>Technical confidence</strong> — precision in spacing, grid, and typography over decorative noise</li>
+              <li><strong>Edge without aggression</strong> — dark, moody palette but never heavy-metal; serious but approachable</li>
+              <li><strong>Minimal chrome, maximal content</strong> — UI stays out of the way; the content is the product</li>
+              <li><strong>Cyber-organic tension</strong> — the crow mascot lives at the intersection of nature and technology; that duality should echo in design choices</li>
+            </ul>
+            <h3 class="rules-h3">What to avoid at all costs</h3>
+            <ul class="rules-ul">
+              <li>Generic "developer blog" aesthetics (purple gradients, neon green on black, overused grid patterns)</li>
+              <li>Corporate softness (rounded pastel cards, emoji-heavy headings, motivational copy)</li>
+              <li>Startup clichés (gradient hero text, floating 3D blobs, stock-photo developer photos)</li>
+              <li>Over-animation for its own sake</li>
+            </ul>
+          </div>
+
+          <!-- §2 Color -->
+          <div class="rules-section" id="r2">
+            <h2 class="rules-h2">2. Color</h2>
+            <h3 class="rules-h3">Usage rules</h3>
+            <ul class="rules-ul">
+              <li><strong>Primary palette</strong> — only three colors should dominate any composition: <code>--ck-ink</code>, <code>--ck-teal</code>, and white/off-white. Everything else is supporting detail.</li>
+              <li><code>--ck-cyan</code> is a <strong>signal color</strong>. Use it sparingly: syntax highlighting, active toggle states, a single decorative glow on the hero, code cursor blinks. Never as a background fill over large areas.</li>
+              <li><strong>Never use raw #000000 or #ffffff for large surfaces</strong> — always use the ink/surface tokens; they carry the warm tint that makes the palette cohesive.</li>
+            </ul>
+            <h3 class="rules-h3">Color ratios per section</h3>
+            <ul class="rules-ul">
+              <li>Background (white or <code>--ck-surface</code>): 70%</li>
+              <li>Ink / text elements: 20%</li>
+              <li>Teal accents: 8%</li>
+              <li>Cyan highlights: 2%</li>
+            </ul>
+            <h3 class="rules-h3">Permitted alpha derivations only</h3>
+            <ul class="rules-ul">
+              <li><code>--ck-teal</code> at 8% → subtle brand-tinted surface (<code>#1a595a14</code>)</li>
+              <li><code>--ck-teal</code> at 20% → brand border (<code>#1a595a33</code>)</li>
+              <li><code>--ck-ink</code> at 6% → divider / hairline (<code>#1d1d1b0f</code>)</li>
+              <li>No other ad-hoc color mixing</li>
+            </ul>
+          </div>
+
+          <!-- §3 Typography -->
+          <div class="rules-section" id="r3">
+            <h2 class="rules-h2">3. Typography</h2>
+            <h3 class="rules-h3">Font stack</h3>
+            <div class="rules-code"><pre>--ck-font-display: "Space Grotesk", "Outfit", sans-serif;
+--ck-font-body:    "Space Grotesk", "Outfit", system-ui, sans-serif;
+--ck-font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;</pre></div>
+            <h3 class="rules-h3">Type scale</h3>
+            <table class="rules-table">
+              <thead><tr><th>Token</th><th>Size</th><th>Weight</th><th>Tracking</th><th>Usage</th></tr></thead>
+              <tbody>
+                <tr><td><code>text-display</code></td><td>56–72px</td><td>400</td><td>-0.02em</td><td>Hero / landmarks</td></tr>
+                <tr><td><code>text-h1</code></td><td>40px</td><td>500</td><td>-0.02em</td><td>Page titles</td></tr>
+                <tr><td><code>text-h2</code></td><td>28px</td><td>500</td><td>-0.015em</td><td>Section headings</td></tr>
+                <tr><td><code>text-h3</code></td><td>20px</td><td>500</td><td>-0.01em</td><td>Card titles</td></tr>
+                <tr><td><code>text-body-lg</code></td><td>18px</td><td>400</td><td>0em</td><td>Lead paragraphs</td></tr>
+                <tr><td><code>text-body</code></td><td>15px</td><td>400</td><td>0em</td><td>Standard copy</td></tr>
+                <tr><td><code>text-small</code></td><td>13px</td><td>400</td><td>0.01em</td><td>Captions, metadata</td></tr>
+                <tr><td><code>text-label</code></td><td>11px</td><td>500</td><td>0.08em</td><td>Tags, overlines (uppercase)</td></tr>
+                <tr><td><code>text-code</code></td><td>14px</td><td>400</td><td>0em</td><td>Inline and block code</td></tr>
+              </tbody>
+            </table>
+            <h3 class="rules-h3">Rules</h3>
+            <ul class="rules-ul">
+              <li><strong>Weight is binary: 400 or 500.</strong> Never use 600, 700, or bold.</li>
+              <li><strong>Headings never use all-caps</strong> except <code>text-label</code>. Sentence case only.</li>
+              <li>Line heights: display/headings <code>1.1</code>; body text <code>1.65</code>; code <code>1.6</code>; UI labels <code>1.2</code></li>
+              <li>Negative tracking at display sizes is mandatory. <code>-0.02em</code> at 56px+ prevents the rounded letterforms from feeling spacey.</li>
+              <li><strong>The wordmark split rule:</strong> "coder" is always <code>--ck-ink</code> and "krow" is always <code>--ck-teal</code>. Non-negotiable above 16px.</li>
+            </ul>
+          </div>
+
+          <!-- §4 Spacing -->
+          <div class="rules-section" id="r4">
+            <h2 class="rules-h2">4. Spacing &amp; layout</h2>
+            <p class="rules-p">All spacing is derived from an <strong>8px base unit</strong>. Max content width: <code>1200px</code>. 12-column grid, <code>24px</code> gutter. Prose caps at <code>680px</code>.</p>
+            <ul class="rules-ul">
+              <li><strong>Asymmetry over symmetry</strong> for landing sections. Deliberate visual weight shifts; not centered everything.</li>
+              <li><strong>Density by hierarchy:</strong> nav/metadata dense; body content airy; hero sections sparse and typographic.</li>
+              <li><strong>No full-bleed background fills</strong> on interior sections unless they carry real semantic weight.</li>
+            </ul>
+          </div>
+
+          <!-- §5 Components -->
+          <div class="rules-section" id="r5">
+            <h2 class="rules-h2">5. Components</h2>
+            <h3 class="rules-h3">Buttons</h3>
+            <div class="rules-code"><pre>Primary:   bg --ck-teal, text white, radius 6px, padding 10px 20px
+           hover → bg --ck-teal-mid; no box-shadow, no gradient
+
+Secondary: bg transparent, border 1px --ck-teal, text --ck-teal
+           hover → bg --ck-teal at 8%
+
+Ghost:     bg transparent, no border, text --ck-muted
+           hover → text --ck-ink</pre></div>
+            <p class="rules-p"><strong>No rounded-pill buttons</strong> (border-radius: 9999px) for primary actions. 6–8px radius only. Pills only for tag/badge elements.</p>
+            <h3 class="rules-h3">Cards</h3>
+            <ul class="rules-ul">
+              <li>Border: <code>1px solid --ck-ink at 6%</code>. Radius: <code>10px</code>. Padding: <code>24px</code>.</li>
+              <li>Hover: border-color → <code>--ck-teal at 20%</code>. No lift, no box-shadow.</li>
+              <li><strong>No drop shadows on cards.</strong> Planarity is the design principle; borders are the only elevation signal.</li>
+            </ul>
+            <h3 class="rules-h3">Code blocks</h3>
+            <ul class="rules-ul">
+              <li><strong>Always dark</strong>, even on light-mode pages. Background: <code>#111110</code>.</li>
+              <li>Keywords: <code>--ck-cyan</code>. Strings: <code>--ck-teal-light</code>. Comments: <code>--ck-muted</code> at 80%.</li>
+              <li>Inline code: <code>bg --ck-teal at 8%</code>, <code>color --ck-teal</code>, <code>border-radius 3px</code>, <code>padding 1px 5px</code>.</li>
+            </ul>
+            <h3 class="rules-h3">Dividers</h3>
+            <p class="rules-p"><strong>Use space, not lines.</strong> When a divider is needed: <code>1px solid --ck-ink at 6%</code>. Never a gradient divider.</p>
+          </div>
+
+          <!-- §6 Iconography -->
+          <div class="rules-section" id="r6">
+            <h2 class="rules-h2">6. Iconography</h2>
+            <ul class="rules-ul">
+              <li>Library: Lucide or Phosphor icons, <strong>outline weight only</strong>.</li>
+              <li>Sizes: 16px inline, 20px actions, 24px feature icons, 32px max decorative.</li>
+              <li>Color: inherits text color; may use <code>--ck-teal</code> for branded moments.</li>
+              <li>The <strong>crow mascot is a brand asset</strong>, not a generic icon. Only in logo lockups, hero sections, and social profile contexts. Never below 40px or inline with body text.</li>
+            </ul>
+          </div>
+
+          <!-- §7 Imagery -->
+          <div class="rules-section" id="r7">
+            <h2 class="rules-h2">7. Imagery &amp; media</h2>
+            <ul class="rules-ul">
+              <li>Flat vector style consistent with the mascot's graphic treatment. Palette must pull from brand tokens.</li>
+              <li>No photorealistic 3D renders or stock photo developer imagery.</li>
+              <li>Video thumbnails: dark background (<code>#111110</code>), teal or cyan for title text, authentic face shots over polished composites.</li>
+              <li>Embed containers use standard card treatment (10px radius, 1px border). Caption text: <code>text-small</code>, <code>--ck-muted</code>.</li>
+            </ul>
+          </div>
+
+          <!-- §8 Animation -->
+          <div class="rules-section" id="r8">
+            <h2 class="rules-h2">8. Motion &amp; animation</h2>
+            <p class="rules-p">Animation library: <strong>anime.js</strong>. All animation should feel intentional and developer-crafted; not bouncy, not flashy.</p>
+            <ul class="rules-ul">
+              <li><strong>Enter animations only.</strong> Elements animate in; they do not animate out unless navigating away.</li>
+              <li>Duration: 200–400ms for UI; 500–800ms for page-level entrances.</li>
+              <li>Easing: <code>easeOutExpo</code> for enter. No spring physics on layout elements.</li>
+              <li>Stagger on lists: <code>anime.stagger(60)</code>, max 400ms total delay.</li>
+            </ul>
+            <h3 class="rules-h3">Permitted</h3>
+            <table class="rules-table">
+              <thead><tr><th>Element</th><th>Animation</th></tr></thead>
+              <tbody>
+                <tr><td>Hero heading</td><td><code>translateY: [16, 0]</code>, <code>opacity: [0, 1]</code>, 600ms easeOutExpo</td></tr>
+                <tr><td>Cards on scroll</td><td><code>translateY: [24, 0]</code>, <code>opacity: [0, 1]</code>, <code>anime.stagger(60)</code></td></tr>
+                <tr><td>Mascot logo</td><td><code>translateY: [0, -6]</code>, loop + alternate, 3000ms easeInOutSine</td></tr>
+                <tr><td>CTA hover</td><td>CSS <code>transform: scale(1.02)</code>, 150ms ease-out</td></tr>
+                <tr><td>Code cursor</td><td>CSS blink keyframe, 1s step-end infinite, <code>--ck-cyan</code></td></tr>
+              </tbody>
+            </table>
+            <h3 class="rules-h3">Forbidden</h3>
+            <ul class="rules-ul">
+              <li>Parallax scrolling on background layers</li>
+              <li>Spinning loaders (use skeleton screens or opacity pulse)</li>
+              <li>Slide-in drawers / panels on desktop</li>
+              <li>Any animation that causes layout shift</li>
+            </ul>
+            <div class="rules-code"><pre>@media (prefers-reduced-motion: reduce) {
+  /* All transitions collapse to opacity-only at 200ms */
+  * {
+    transition-duration: 200ms !important;
+    animation-duration: 200ms !important;
+  }
+  /* Transforms disabled; only opacity changes remain */
+}</pre></div>
+          </div>
+
+          <!-- §9 Voice -->
+          <div class="rules-section" id="r9">
+            <h2 class="rules-h2">9. Voice &amp; content rules</h2>
+            <ul class="rules-ul">
+              <li><strong>Direct.</strong> Never pad. "Learn Astro in 20 minutes" beats "Discover the amazing world of Astro with this comprehensive guide."</li>
+              <li><strong>Technical without being exclusive.</strong> Write for working developers.</li>
+              <li><strong>First person, singular.</strong> "I build in public." Not "We create content." Personal brand.</li>
+              <li><code>coderkrow</code> is always lowercase. Never <code>CoderKrow</code> or <code>CODERKROW</code>.</li>
+              <li>No em dashes, no regular dashes in copy. Short sentences; semicolons and commas for rhythm.</li>
+            </ul>
+            <h3 class="rules-h3">Heading patterns</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--ck-space-3); margin-bottom:var(--ck-space-4)">
+              <div style="background:rgba(26,89,90,.06); border:1px solid rgba(26,89,90,.2); border-radius:var(--ck-r-md); padding:var(--ck-space-4)">
+                <div style="font-size:11px; font-weight:500; color:var(--ck-teal); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:var(--ck-space-3)">Do</div>
+                <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:6px">
+                  <li style="font-size:13px; color:var(--ck-muted)">"Building a router from scratch"</li>
+                  <li style="font-size:13px; color:var(--ck-muted)">"Why I rewrote it in Rust"</li>
+                  <li style="font-size:13px; color:var(--ck-muted)">"Ship faster. Break less."</li>
+                </ul>
+              </div>
+              <div style="background:rgba(200,60,60,.05); border:1px solid rgba(200,60,60,.2); border-radius:var(--ck-r-md); padding:var(--ck-space-4)">
+                <div style="font-size:11px; font-weight:500; color:#c83c3c; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:var(--ck-space-3)">Don't</div>
+                <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:6px">
+                  <li style="font-size:13px; color:var(--ck-muted)">"Unlock the power of modern web development"</li>
+                  <li style="font-size:13px; color:var(--ck-muted)">"Your Ultimate Guide to TypeScript"</li>
+                  <li style="font-size:13px; color:var(--ck-muted)">"Welcome to my coding journey!"</li>
+                </ul>
+              </div>
+            </div>
+            <h3 class="rules-h3">Metadata format</h3>
+            <ul class="rules-ul">
+              <li>Dates: <code>Jun 29, 2026</code> — no ordinals, no spelled-out months in dense contexts</li>
+              <li>Read time: <code>8 min read</code> — always lowercase, no period</li>
+              <li>View counts: <code>12.4K views</code> — not 12,432</li>
+              <li>Tags: lowercase, no hashtag prefix — <code>astro</code>, <code>typescript</code>, <code>web-performance</code></li>
+            </ul>
+          </div>
+
+          <!-- §10 Do/Don't -->
+          <div class="rules-section" id="r10">
+            <h2 class="rules-h2">10. Do / don't reference</h2>
+            <div class="do-dont">
+              <div class="do-col">
+                <div class="do-header">Do</div>
+                <ul class="do-list">
+                  <li><code>--ck-teal</code> for interactive elements</li>
+                  <li>Headings at weight 400–500</li>
+                  <li><code>--ck-cyan</code> for code highlights and active states</li>
+                  <li>Mascot at ≥ 40px always</li>
+                  <li>Dark code blocks always</li>
+                  <li>Sentence case on all headings</li>
+                  <li><code>coderkrow</code> lowercase everywhere</li>
+                  <li>Space Grotesk as display/body font</li>
+                  <li>JetBrains Mono for all code</li>
+                  <li>8px-based spacing grid</li>
+                  <li>Border-radius 6–12px on components</li>
+                  <li>Flat planarity-based UI (no shadows)</li>
+                  <li>Authentic developer screenshots</li>
+                  <li>Reduced motion compliance</li>
+                </ul>
+              </div>
+              <div class="dont-col">
+                <div class="dont-header">Don't</div>
+                <ul class="dont-list">
+                  <li>Teal as background on large sections</li>
+                  <li><code>font-weight: 700</code> or bold anywhere</li>
+                  <li>Cyan as paragraph text or large fills</li>
+                  <li>Crop, recolor, or restyle the crow mascot</li>
+                  <li>Light-mode code blocks</li>
+                  <li>Title Case on headings</li>
+                  <li><code>CoderKrow</code>, <code>CODERKROW</code>, <code>Coderkrow</code></li>
+                  <li>Inter, Roboto, Arial, or generic sans-serif</li>
+                  <li>Courier, Monaco, or monospace fallback-only</li>
+                  <li>Arbitrary spacing (e.g. 13px, 22px)</li>
+                  <li><code>border-radius: 9999px</code> on non-pill elements</li>
+                  <li>Drop shadows, blur backgrounds, card lifts</li>
+                  <li>Stock photos of keyboards or screens</li>
+                  <li>Ignoring <code>prefers-reduced-motion</code></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- §11 Prohibited -->
+          <div class="rules-section" id="r11">
+            <h2 class="rules-h2">11. Prohibited patterns</h2>
+            <p class="rules-p">The following must <strong>never appear</strong> in any generated design or content:</p>
+            <ol class="prohibited-list">
+              <li><span class="prohibited-num">01</span>Purple or violet as any part of the palette</li>
+              <li><span class="prohibited-num">02</span>Gradient text (especially multi-color gradient on headings)</li>
+              <li><span class="prohibited-num">03</span>Glassmorphism / frosted blur card surfaces</li>
+              <li><span class="prohibited-num">04</span>Neumorphic soft-shadow UI</li>
+              <li><span class="prohibited-num">05</span>Parallax hero backgrounds</li>
+              <li><span class="prohibited-num">06</span>Animated gradient mesh backgrounds</li>
+              <li><span class="prohibited-num">07</span>AI-generated photorealistic imagery</li>
+              <li><span class="prohibited-num">08</span>Any font other than Space Grotesk / Outfit / JetBrains Mono</li>
+              <li><span class="prohibited-num">09</span>Animated emoji or Lottie decoration</li>
+              <li><span class="prohibited-num">10</span>Social proof layouts with fake-looking star ratings or avatar clusters</li>
+            </ol>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme toggle
+    (function() {
+      const root = document.documentElement;
+      const btns = document.querySelectorAll('.theme-btn');
+      function apply(mode) {
+        if (mode === 'system') { root.removeAttribute('data-theme'); }
+        else { root.setAttribute('data-theme', mode); }
+        btns.forEach(b => b.classList.toggle('active', b.dataset.themeChoice === mode));
+        try { localStorage.setItem('ck-theme', mode); } catch (e) {}
+      }
+      let saved = 'system';
+      try { saved = localStorage.getItem('ck-theme') || 'system'; } catch (e) {}
+      apply(saved);
+      btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.themeChoice)));
+    })();
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Copy tokens
+    function copyTokens(btn) {
+      const raw = `:root {
+  /* Color */
+  --ck-ink:         #1d1d1b;
+  --ck-teal:        #1a595a;
+  --ck-teal-mid:    #2e7f80;
+  --ck-teal-light:  #3bb8ba;
+  --ck-cyan:        #00d1d4;
+  --ck-surface:     #f5f4f0;
+  --ck-muted:       #4a4a47;
+  --ck-bg:          #ffffff;
+
+  /* Typography */
+  --ck-font:   "Space Grotesk", "Outfit", sans-serif;
+  --ck-mono:   "JetBrains Mono", "Fira Code", monospace;
+
+  /* Spacing */
+  --ck-space-1:   4px;
+  --ck-space-2:   8px;
+  --ck-space-3:   12px;
+  --ck-space-4:   16px;
+  --ck-space-5:   20px;
+  --ck-space-6:   24px;
+  --ck-space-8:   32px;
+  --ck-space-12:  48px;
+  --ck-space-16:  64px;
+  --ck-space-24:  96px;
+  --ck-space-32:  128px;
+
+  /* Border radius */
+  --ck-r-xs:   2px;
+  --ck-r-sm:   4px;
+  --ck-r-md:   8px;
+  --ck-r-lg:   10px;
+  --ck-r-xl:   12px;
+  --ck-r-full: 9999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ck-bg:      #111110;
+    --ck-surface: #1a1a18;
+    --ck-ink:     #e8e6df;
+    --ck-muted:   #888780;
+  }
+}
+/* manual override, e.g. via toggle: <html data-theme="dark|light"> */
+:root[data-theme="dark"] {
+  --ck-bg:      #111110;
+  --ck-surface: #1a1a18;
+  --ck-ink:     #e8e6df;
+  --ck-muted:   #888780;
+}`;
+      navigator.clipboard.writeText(raw).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => btn.textContent = orig, 2000);
+      });
+    }
+
+    // ToC active link on scroll (rules tab)
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          document.querySelectorAll('.toc-link').forEach(a => {
+            a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
+          });
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    document.querySelectorAll('.rules-section[id]').forEach(s => observer.observe(s));
+  </script>
+</body>
+</html>

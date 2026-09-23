@@ -5,6 +5,15 @@
 Python 3.12 · FastAPI backend + Textual TUI client · async-first market data
 Adapter pattern for exchange integrations · Pydantic v2 models · pydantic-settings for config
 
+## Project Rules
+
+Rules live in `.ai/rules/` (one folder per area, body in `RULES.md`). OpenCode V2 does not auto-load them. At the start of a task:
+
+1. Read the index: [`.ai/rules/README.md`](.ai/rules/README.md)
+2. Open every rule that applies to the task — mandatory before any design/UI work (`brand/RULES.md`).
+
+Update the index table when adding a rule (see "Adding a rule" there).
+
 ## Repo Layout
 
 - `app/` — FastAPI server (entry: `app.main:app`)
