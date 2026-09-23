@@ -31,6 +31,23 @@ mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
   `POST /alerts/evaluate` only).
 - Linter / type checker / CI.
 
+## [0.2.3] - 2026-09-23
+
+### Fixed
+
+- **TUI freeze after tab navigation**: switching between Markets and Alerts
+  unmounted the screen being left, so returning to a destroyed screen left the
+  app idle and every key appeared dead. Both screens now stay mounted and are
+  swapped by name.
+
+### Changed
+
+- Tab bar, mode label and data stay in sync when tabbing or clicking back to
+  Markets (tab from Alerts lands on Top instead of skipping to Gainers); the
+  Screener filter input no longer swallows printable shortcuts; the Alerts
+  screen shows its keys and a per-screen banner title.
+- README documents the tab / watchlist cycling keys.
+
 ## [0.2.2] - 2026-09-23
 
 ### Added
@@ -158,7 +175,8 @@ Initial release.
   repositories, the REST surface, notification delivery, settings, and TUI
   flows via Textual's pilot.
 
-[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.2...HEAD
+[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.3...HEAD
+[0.2.3]: https://github.com/corderkrow/trading-tui/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/corderkrow/trading-tui/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/corderkrow/trading-tui/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/corderkrow/trading-tui/compare/0.1.0...0.2.0
