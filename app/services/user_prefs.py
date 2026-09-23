@@ -27,10 +27,31 @@ def settings_path() -> Path:
     ).expanduser()
 
 
+_cache: tuple[Path, int, set[str] | None] | None = None
+
+
 def allowed_channels(path: Path | None = None) -> set[str] | None:
-    """Channels permitted by the delivery pref; None means "no pref"."""
+    """Channels permitted by the delivery pref; None means "no pref".
+
+    Called on every notification dispatch, so the parsed result is cached and
+    only re-read when the file's mtime changes.
+    """
+    resolved = path or settings_path()
     try:
-        data = json.loads((path or settings_path()).read_text(encoding="utf-8"))
+        mtime = resolved.stat().st_mtime_ns
+    except OSError:
+        return None
+    global _cache
+    if _cache is not None and _cache[0] == resolved and _cache[1] == mtime:
+        return _cache[2]
+    result = _read_allowed_channels(resolved)
+    _cache = (resolved, mtime, result)
+    return result
+
+
+def _read_allowed_channels(path: Path) -> set[str] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
         delivery = data["notifications"]["price_alert_delivery"]
         return DELIVERY_CHANNELS[delivery]
     except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, OSError):

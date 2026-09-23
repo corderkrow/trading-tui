@@ -423,3 +423,46 @@ async def test_prices_screen_shows_quotes(pilot_app):
     await pilot.pause()
     assert not isinstance(app.screen, PricesScreen)
     assert isinstance(app.screen, AlertListScreen)
+
+
+async def test_candles_refetch_when_cache_stale(prices_app):
+    app, pilot, api = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+
+    calls: list[str] = []
+    original = api.get_last_candle
+
+    async def counting(symbol: str):
+        calls.append(symbol)
+        return await original(symbol)
+
+    api.get_last_candle = counting
+    screen = app.screen
+    screen._candles_at = -10_000.0  # far past any TTL -> cache is stale
+    await screen.reload()
+
+    assert calls, "stale candle cache should be refreshed"
+    assert screen._candles_at > 0.0
+
+
+async def test_candles_reused_when_cache_fresh(prices_app):
+    import time
+
+    app, pilot, api = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+
+    calls: list[str] = []
+    original = api.get_last_candle
+
+    async def counting(symbol: str):
+        calls.append(symbol)
+        return await original(symbol)
+
+    api.get_last_candle = counting
+    screen = app.screen
+    screen._candles_at = time.monotonic()  # fresh
+    await screen.reload()
+
+    assert calls == [], "fresh candle cache should not hit the API"

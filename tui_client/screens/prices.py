@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from math import ceil
 
 from textual.app import ComposeResult
@@ -159,6 +160,7 @@ class PricesScreen(Screen[None]):
         self._page: int = 1
         self._alert_states: dict[str, str] = {}
         self._candles: dict[str, CandleView] = {}
+        self._candles_at: float = 0.0
         self._search: str = ""
         self._server_search: bool = False
         self._search_timer = None
@@ -255,7 +257,7 @@ class PricesScreen(Screen[None]):
     def _filter_color() -> str:
         return INK
 
-    def _mode_name(self) -> str:
+    def _mode_name(self, total_quotes: int | None = None) -> str:
         if self.mode == "w":
             base = f"Watchlist: {self.active_watchlist}"
         elif self.mode == "s":
@@ -268,25 +270,22 @@ class PricesScreen(Screen[None]):
             label = dict(SORT_FIELDS.values())[self._sort_field]
             arrow = "▼" if self._sort_reverse else "▲"
             parts.append(f"{label} {arrow}")
-        total_pages = self._page_count()
+        total_pages = self._page_count(total_quotes)
         if total_pages > 1:
             parts.append(f"{self._page}/{total_pages}")
         return " · ".join(parts)
 
-    def _page_count(self) -> int:
-        return max(
-            1,
-            ceil(
-                len(
-                    [
-                        q
-                        for q in self._quotes
-                        if self._matches_search(q) and self._matches_change_filter(q)
-                    ]
-                )
-                / PAGE_SIZE
-            ),
-        )
+    def _page_count(self, total_quotes: int | None = None) -> int:
+        """Page count; pass `total_quotes` to reuse an already-filtered list."""
+        if total_quotes is None:
+            total_quotes = len(
+                [
+                    q
+                    for q in self._quotes
+                    if self._matches_search(q) and self._matches_change_filter(q)
+                ]
+            )
+        return max(1, ceil(total_quotes / PAGE_SIZE))
 
     def _matches_search(self, quote: QuoteView) -> bool:
         if self._server_search:
@@ -298,10 +297,10 @@ class PricesScreen(Screen[None]):
             haystack += " " + quote.name.lower()
         return self._search in haystack
 
-    def _update_mode_label(self) -> None:
+    def _update_mode_label(self, total_quotes: int | None = None) -> None:
         self._update_tabs()
         label = self.query_one("#mode-label", Static)
-        label.update(f"[bold]{self._mode_name()}[/]")
+        label.update(f"[bold]{self._mode_name(total_quotes)}[/]")
 
     def prepare_mode(self, mode: str) -> None:
         """Set the mode (and reset sort/page) to apply on next mount."""
@@ -374,7 +373,7 @@ class PricesScreen(Screen[None]):
             for q in self._sorted()
             if self._matches_search(q) and self._matches_change_filter(q)
         ]
-        total_pages = self._page_count()
+        total_pages = self._page_count(len(quotes))
         if self._page > total_pages:
             self._page = total_pages
         start = (self._page - 1) * PAGE_SIZE
@@ -392,7 +391,7 @@ class PricesScreen(Screen[None]):
                 self._alert_cell(quote.symbol),
                 key=quote.symbol,
             )
-        self._update_mode_label()
+        self._update_mode_label(len(quotes))
 
     async def reload(self) -> None:
         try:
@@ -422,21 +421,32 @@ class PricesScreen(Screen[None]):
         await self._load_candles()
         self._rebuild_table()
 
+    def _candle_ttl(self) -> float:
+        """Candles go stale with the quote refresh cadence (5 min fallback)."""
+        if self._display is not None:
+            return self._display.refresh_interval_minutes * 60
+        return 300.0
+
     async def _load_candles(self) -> None:
         """Fetch latest candle per row on the current page; cache by symbol."""
         page = min(self._page, self._page_count())
         start = (page - 1) * PAGE_SIZE
         page_symbols = [q.symbol for q in self._quotes[start : start + PAGE_SIZE]]
-        missing = [s for s in page_symbols if s not in self._candles]
+        stale = time.monotonic() - self._candles_at > self._candle_ttl()
+        missing = [s for s in page_symbols if stale or s not in self._candles]
         if not missing:
             return
         results = await asyncio.gather(
             *(self.api.get_last_candle(s) for s in missing),
             return_exceptions=True,
         )
+        refreshed = False
         for symbol, result in zip(missing, results):
             if isinstance(result, CandleView):
                 self._candles[symbol] = result
+                refreshed = True
+        if refreshed:
+            self._candles_at = time.monotonic()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "search":

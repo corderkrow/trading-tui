@@ -1,10 +1,8 @@
 """Market data REST endpoints."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from app.models.candle import CandleOHLCV
 from app.models.ticker import NewsHit, ScreenerResult, SearchHit, Ticker
-from app.config import settings
-from app.services.adapters import get_adapter
 from app.services.adapters.base import MarketDataAdapter
 from app.services.market_data import (
     fetch_candles_async,
@@ -21,8 +19,9 @@ SCREENER_SORTS = {"marketcap", "percentchange", "price"}
 router = APIRouter(prefix="/market", tags=["market"])
 
 
-def get_market_adapter() -> MarketDataAdapter:
-    return get_adapter(settings.ADAPTER_NAME)
+def get_market_adapter(request: Request) -> MarketDataAdapter:
+    """Return the process-wide adapter created in `create_app`."""
+    return request.app.state.market_adapter
 
 
 @router.get("/candles", response_model=list[CandleOHLCV])

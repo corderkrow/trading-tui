@@ -90,19 +90,21 @@ class PriceTurnsNegativeCondition(_ChangePercentCondition):
         return context.previous_change >= 0 and context.change < 0
 
 
+_STRATEGIES: dict[Operator, type[Condition]] = {
+    Operator.ABOVE: PriceAboveCondition,
+    Operator.BELOW: PriceBelowCondition,
+    Operator.CROSSING: PriceCrossingCondition,
+    Operator.RISES_BY: PriceRisesByCondition,
+    Operator.FALLS_BY: PriceFallsByCondition,
+    Operator.TURNS_POSITIVE: PriceTurnsPositiveCondition,
+    Operator.TURNS_NEGATIVE: PriceTurnsNegativeCondition,
+}
+
+
 def build_condition(spec: ConditionSpec) -> Condition:
     """Factory mapping a ConditionSpec to its strategy implementation."""
-    strategies: dict[Operator, type[Condition]] = {
-        Operator.ABOVE: PriceAboveCondition,
-        Operator.BELOW: PriceBelowCondition,
-        Operator.CROSSING: PriceCrossingCondition,
-        Operator.RISES_BY: PriceRisesByCondition,
-        Operator.FALLS_BY: PriceFallsByCondition,
-        Operator.TURNS_POSITIVE: PriceTurnsPositiveCondition,
-        Operator.TURNS_NEGATIVE: PriceTurnsNegativeCondition,
-    }
     try:
-        strategy_cls = strategies[spec.operator]
+        strategy_cls = _STRATEGIES[spec.operator]
     except KeyError:
         from app.services.alerts.errors import InvalidAlertCondition
 

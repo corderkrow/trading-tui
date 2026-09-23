@@ -1,0 +1,9 @@
+{
+  "alerts": 50,
+  "ticks": 20,
+  "list_only_ms": 0.67,
+  "handle_price_total_ms": 112.99,
+  "handle_price_ms_per_tick": 5.65,
+  "commits_total": 20,
+  "commits_per_tick": 1.0
+}

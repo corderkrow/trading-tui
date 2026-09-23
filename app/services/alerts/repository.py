@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from app.services.alerts.domain import Alert
@@ -13,6 +14,7 @@ class AlertRepository(Protocol):
     async def get(self, alert_id: str) -> Alert: ...
     async def list(self) -> list[Alert]: ...
     async def update(self, alert: Alert) -> Alert: ...
+    async def update_many(self, alerts: Sequence[Alert]) -> None: ...
     async def delete(self, alert_id: str) -> None: ...
 
 
@@ -40,6 +42,13 @@ class InMemoryAlertRepository:
             raise AlertNotFound(alert.id)
         self._alerts[alert.id] = alert
         return alert
+
+    async def update_many(self, alerts: Sequence[Alert]) -> None:
+        for alert in alerts:
+            if alert.id not in self._alerts:
+                raise AlertNotFound(alert.id)
+        for alert in alerts:
+            self._alerts[alert.id] = alert
 
     async def delete(self, alert_id: str) -> None:
         if alert_id not in self._alerts:

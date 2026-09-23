@@ -29,7 +29,58 @@ mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
 - Binance screeners / custom screener (`NotImplementedError` today).
 - Automatic alert evaluation wired to the price stream (currently via
   `POST /alerts/evaluate` only).
-- Shared adapter HTTP-client lifecycle; linter / type checker / CI.
+- Linter / type checker / CI.
+
+## [0.2.1] - 2026-09-23
+
+### Fixed
+
+- **Stale OHLC in the prices screen**: the first candle fetched for a symbol was
+  cached for the whole session. Candles now refresh on the configured refresh
+  interval, so the OHLC column keeps up with the quotes.
+- **Yahoo quotes with no price**: symbols Yahoo returns without a price are now
+  skipped instead of failing the whole request with a validation error.
+- **Expiration during a list read** wrote one commit per expired alert; expired
+  alerts are now persisted in a single transaction.
+
+### Changed
+
+- **One adapter per app**: the market-data adapter (and its HTTP connection
+  pool) is created once in `create_app` and closed on shutdown, instead of a new
+  adapter + client per request. The Yahoo cookie/crumb pair now survives between
+  requests. `create_app` accepts an optional `adapter=` for tests and overrides.
+- **Batched Yahoo quotes**: `YahooAdapter.fetch_tickers` issues a single
+  `/v7/finance/quote` request, falling back to concurrent per-symbol reads when
+  the cookie/crumb pair is unavailable. `ScreenerAuthError` is renamed to
+  `YahooAuthError` since it now covers quote auth too.
+- **Batched alert persistence**: `AlertService.handle_price` persists all
+  evaluated alerts through the new `AlertRepository.update_many`, so a tick
+  writes one transaction instead of one commit per alert. The condition strategy
+  map is built once per process, and one `MarketContext` is built per alert
+  evaluation.
+- **Delivery preference caching**: the notification delivery filter reads the
+  settings file only when its mtime changes.
+- **Prices screen**: filtered rows are computed once per rebuild instead of
+  three times, and the page count reuses an already-filtered list.
+
+### Performance
+
+Measured with the new benchmarks (medians over repeated runs):
+
+- `GET /market/quotes` (6 symbols): **1,133 ms → 141 ms**.
+- `GET /market/candles` (`limit=1000`): **419 ms → 161 ms**.
+- Alert evaluation, 50 alerts: **233 ms → 5.7 ms** per tick, commits per tick
+  **50 → 1**.
+- Prices screen rebuild, 250 quotes: **1.68 ms → 0.99 ms** (filter scans 3 → 1).
+
+### Added
+
+- Benchmarks: `benchmarks/profile_market.py` and `benchmarks/profile_alerts.py`,
+  with recorded runs under `benchmarks/results/`.
+- `tests/test_yahoo_adapter.py`: batched quotes, missing prices, the shared
+  adapter dependency, and adapter shutdown on lifespan exit.
+- Coverage for `update_many`, the delivery-preference cache, and candle
+  refresh/cache reuse.
 
 ## [0.2.0] - 2026-09-15
 
@@ -99,6 +150,7 @@ Initial release.
   repositories, the REST surface, notification delivery, settings, and TUI
   flows via Textual's pilot.
 
-[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/corderkrow/trading-tui/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/corderkrow/trading-tui/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/corderkrow/trading-tui/releases/tag/0.1.0

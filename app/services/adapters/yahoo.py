@@ -1,5 +1,6 @@
 """Yahoo Finance adapter implementation — no API key required."""
 
+import asyncio
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
@@ -34,8 +35,8 @@ SCREENER_FIELDS: dict[str, str] = {
 }
 
 
-class ScreenerAuthError(Exception):
-    """Crumb could not be obtained from Yahoo."""
+class YahooAuthError(Exception):
+    """Cookie + crumb pair could not be obtained from Yahoo."""
 
 
 class YahooAdapter(MarketDataAdapter):
@@ -100,22 +101,40 @@ class YahooAdapter(MarketDataAdapter):
         )
 
     async def fetch_tickers(self, symbols: list[str]) -> list[Ticker]:
-        results: list[Ticker] = []
-        for symbol in symbols:
+        """Batch quote lookup: one request for all symbols, not N sequential ones."""
+        if not symbols:
+            return []
+        try:
+            return await self._fetch_tickers_batch(symbols)
+        except YahooAuthError:
+            # The cookie/crumb service fails independently of quote data; fall
+            # back to concurrent per-symbol calls instead of failing the request.
+            return await self._fetch_tickers_concurrent(symbols)
+
+    async def _fetch_tickers_batch(self, symbols: list[str]) -> list[Ticker]:
+        resp = await self._authed_request(
+            "GET", "/v7/finance/quote", params={"symbols": ",".join(symbols)}
+        )
+        resp.raise_for_status()
+        quotes = resp.json()["quoteResponse"]["result"]
+        # Yahoo omits the price for halted/delisted instruments; Ticker rejects 0.
+        return [self._to_ticker(q) for q in quotes if q.get("regularMarketPrice")]
+
+    async def _fetch_tickers_concurrent(self, symbols: list[str]) -> list[Ticker]:
+        async def fetch_one(symbol: str) -> Ticker:
             resp = await self._client.get(
                 f"/v8/finance/chart/{symbol}",
                 params={"interval": "1d", "range": "1d"},
             )
             resp.raise_for_status()
             meta = resp.json()["chart"]["result"][0]["meta"]
-            results.append(
-                Ticker(
-                    symbol=meta["symbol"],
-                    price=float(meta["regularMarketPrice"]),
-                    change_24h=meta.get("regularMarketChangePercent"),
-                )
+            return Ticker(
+                symbol=meta["symbol"],
+                price=float(meta["regularMarketPrice"]),
+                change_24h=meta.get("regularMarketChangePercent"),
             )
-        return results
+
+        return list(await asyncio.gather(*(fetch_one(s) for s in symbols)))
 
     async def fetch_screeners(self, scr_id: str, count: int = 5) -> list[Ticker]:
         """Predefined Yahoo screeners: most_actives, day_gainers, day_losers."""
@@ -223,15 +242,40 @@ class YahooAdapter(MarketDataAdapter):
             if cookie.name == "A3":
                 cookies.set("A3", cookie.value, domain=".yahoo.com")
         if not cookies.get("A3"):
-            raise ScreenerAuthError("Yahoo did not issue an A3 cookie")
-        crumb = await self._client.get("/v1/test/getcrumb", cookies=cookies)
+            raise YahooAuthError("Yahoo did not issue an A3 cookie")
+        crumb = await self._client.get(
+            "/v1/test/getcrumb", headers={"Cookie": f"A3={cookies.get('A3')}"}
+        )
         crumb.raise_for_status()
         crumb_text = crumb.text.strip()
         if not crumb_text:
-            raise ScreenerAuthError("Yahoo returned an empty crumb")
+            raise YahooAuthError("Yahoo returned an empty crumb")
         self._crumb = crumb_text
         self._cookie = cookies.get("A3")
         return self._crumb, self._cookie
+
+    async def _authed_request(self, method: str, path: str, **kwargs) -> httpx.Response:
+        """Request carrying the A3 cookie + crumb; refreshes the pair once on 401."""
+        params = {**kwargs.pop("params", {})}
+        extra_headers = {**kwargs.pop("headers", {})}
+
+        async def send() -> httpx.Response:
+            crumb, cookie = await self._get_crumb()
+            return await self._client.request(
+                method,
+                path,
+                params={**params, "crumb": crumb},
+                headers={**extra_headers, "Cookie": f"A3={cookie}"},
+                **kwargs,
+            )
+
+        resp = await send()
+        if resp.status_code == 401:
+            # stale crumb — refresh once and retry
+            self._crumb = None
+            self._cookie = None
+            resp = await send()
+        return resp
 
     async def fetch_screener_search(
         self,
@@ -265,24 +309,7 @@ class YahooAdapter(MarketDataAdapter):
             "userId": "",
             "userIdType": "guid",
         }
-        crumb, cookie = await self._get_crumb()
-        resp = await self._client.post(
-            "/v1/finance/screener",
-            params={"crumb": crumb},
-            cookies=httpx.Cookies({"A3": cookie}),
-            json=body,
-        )
-        if resp.status_code == 401:
-            # stale crumb — refresh once and retry
-            self._crumb = None
-            self._cookie = None
-            crumb, cookie = await self._get_crumb()
-            resp = await self._client.post(
-                "/v1/finance/screener",
-                params={"crumb": crumb},
-                cookies=httpx.Cookies({"A3": cookie}),
-                json=body,
-            )
+        resp = await self._authed_request("POST", "/v1/finance/screener", json=body)
         resp.raise_for_status()
         result = resp.json()["finance"]["result"][0]
         return {

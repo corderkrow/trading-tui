@@ -158,6 +158,25 @@ async def test_service_flow_with_sqlite(tmp_path, repo_factory):
     assert await service.handle_price("SOLUSDT", 999.0) == []
 
 
+async def test_update_many_persists_batch(tmp_path, repo_factory):
+    repo = repo_factory()
+    first = make_alert(symbol="BTCUSDT")
+    second = make_alert(symbol="ETHUSDT")
+    await repo.create(first)
+    await repo.create(second)
+    first.status = AlertStatus.DISABLED
+    second.status = AlertStatus.EXPIRED
+    await repo.update_many([first, second])
+    assert (await repo.get(first.id)).status == AlertStatus.DISABLED
+    assert (await repo.get(second.id)).status == AlertStatus.EXPIRED
+
+
+async def test_update_many_missing_alert_raises(tmp_path, repo_factory):
+    repo = repo_factory()
+    with pytest.raises(AlertNotFound):
+        await repo.update_many([make_alert(id="nope")])
+
+
 async def test_swap_parity_with_inmemory(tmp_path, repo_factory):
     """Same operations behave identically on both repository implementations."""
     for repo in (InMemoryAlertRepository(), repo_factory()):

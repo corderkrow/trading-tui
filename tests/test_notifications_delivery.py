@@ -44,6 +44,25 @@ def test_allowed_channels_unknown_delivery_is_none(tmp_path: Path) -> None:
     assert allowed_channels(_write_prefs(tmp_path / "s.json", "telepathy")) is None
 
 
+def test_allowed_channels_cached_until_mtime_changes(tmp_path: Path, monkeypatch) -> None:
+    path = _write_prefs(tmp_path / "s.json", "push")
+    assert allowed_channels(path) == {"push"}
+
+    reads = {"n": 0}
+    original = Path.read_text
+
+    def counting(self, *args, **kwargs):
+        reads["n"] += 1
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", counting)
+    assert allowed_channels(path) == {"push"}
+    assert reads["n"] == 0  # served from cache, no disk read on dispatch
+
+    _write_prefs(path, "none")
+    assert allowed_channels(path) == set()  # mtime changed -> re-read
+
+
 # ── delivery filter on NotificationService ───────────────────
 
 def _alert(channels: list[str]) -> Alert:

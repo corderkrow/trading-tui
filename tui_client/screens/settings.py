@@ -28,7 +28,7 @@ def _radio_set(options: list[tuple[str, str]], value: str, set_id: str) -> Radio
     return RadioSet(*buttons, id=set_id)
 
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 REFRESH_CHOICES = [("5 min", 5), ("10 min", 10), ("15 min", 15), ("30 min", 30), ("1h", 60)]
 
 

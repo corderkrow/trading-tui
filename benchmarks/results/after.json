@@ -1,0 +1,36 @@
+{
+  "adapter_construct": {
+    "n": 100,
+    "mean_ms": 4.21,
+    "median_ms": 4.02,
+    "min_ms": 3.82,
+    "max_ms": 6.13
+  },
+  "quotes_concurrent_target": {
+    "six_symbols_concurrent_ms": 787.8
+  },
+  "tickers_fetch": {
+    "one_symbol_ms": 1465.83,
+    "six_symbols_ms": 442.35,
+    "per_symbol_ms": 73.73
+  },
+  "client_churn": {
+    "requests": 5,
+    "clients_created": 2,
+    "clients_closed": 1
+  },
+  "asgi_quotes_6": {
+    "n": 3,
+    "mean_ms": 554.95,
+    "median_ms": 140.69,
+    "min_ms": 121.64,
+    "max_ms": 1402.53
+  },
+  "asgi_candles_1000": {
+    "n": 3,
+    "mean_ms": 300.36,
+    "median_ms": 161.23,
+    "min_ms": 143.2,
+    "max_ms": 596.65
+  }
+}

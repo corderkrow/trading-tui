@@ -68,13 +68,20 @@ class AlertService:
 
     async def get(self, alert_id: str) -> Alert:
         alert = await self.repository.get(alert_id)
-        await self._expire_if_needed(alert)
+        if self._is_expired(alert, self._clock()):
+            alert.status = AlertStatus.EXPIRED
+            await self.repository.update(alert)
         return alert
 
     async def list(self) -> list[Alert]:
         alerts = await self.repository.list()
-        for alert in alerts:
-            await self._expire_if_needed(alert)
+        now = self._clock()
+        expired = [alert for alert in alerts if self._is_expired(alert, now)]
+        for alert in expired:
+            alert.status = AlertStatus.EXPIRED
+        if expired:
+            # single transaction instead of one commit per expired alert
+            await self.repository.update_many(expired)
         return alerts
 
     async def delete(self, alert_id: str) -> None:
@@ -98,14 +105,13 @@ class AlertService:
         """Observer entry point: react to a market price update."""
         now = at or self._clock()
         triggered: list[AlertEvent] = []
+        evaluated: list[Alert] = []
         for alert in await self.repository.list():
             if alert.status is not AlertStatus.ACTIVE:
                 continue
-            if alert.expires_at is not None and alert.expires_at <= now:
+            if self._is_expired(alert, now):
                 alert.status = AlertStatus.EXPIRED
-                await self.repository.update(alert)
-                continue
-            if await self._matches(alert, symbol, price, now):
+            elif await self._matches(alert, symbol, price, now):
                 event = AlertEvent(
                     alert_id=alert.id,
                     symbol=symbol,
@@ -118,7 +124,10 @@ class AlertService:
                     alert.status = AlertStatus.TRIGGERED
                     alert.triggered_at = now
             alert.last_evaluated_at = now
-            await self.repository.update(alert)
+            evaluated.append(alert)
+        if evaluated:
+            # one transaction per tick instead of one commit per alert
+            await self.repository.update_many(evaluated)
         for event in triggered:
             alert = await self.repository.get(event.alert_id)
             await self.notifications.dispatch(alert, event)
@@ -128,18 +137,15 @@ class AlertService:
         previous_price = self._previous_prices.get(symbol)
         change = self._percent_change(previous_price, price)
         previous_change = self._previous_changes.get(symbol)
-        results: list[bool] = []
-        for spec in alert.conditions:
-            context = MarketContext(
-                symbol=symbol,
-                price=price,
-                previous_price=previous_price,
-                change=change,
-                previous_change=previous_change,
-                at=now,
-            )
-            condition = build_condition(spec)
-            results.append(condition.evaluate(context))
+        context = MarketContext(
+            symbol=symbol,
+            price=price,
+            previous_price=previous_price,
+            change=change,
+            previous_change=previous_change,
+            at=now,
+        )
+        results = [build_condition(spec).evaluate(context) for spec in alert.conditions]
         if alert.match_mode == MatchMode.ANY:
             matched = any(results)
         else:
@@ -155,14 +161,13 @@ class AlertService:
             return None
         return (price - previous_price) / previous_price * 100
 
-    async def _expire_if_needed(self, alert: Alert) -> None:
-        if (
+    @staticmethod
+    def _is_expired(alert: Alert, now: datetime) -> bool:
+        return (
             alert.status is AlertStatus.ACTIVE
             and alert.expires_at is not None
-            and alert.expires_at <= self._clock()
-        ):
-            alert.status = AlertStatus.EXPIRED
-            await self.repository.update(alert)
+            and alert.expires_at <= now
+        )
 
     async def _raise_if_expired(self, alert: Alert) -> None:
         if alert.expires_at is not None and alert.expires_at <= self._clock():

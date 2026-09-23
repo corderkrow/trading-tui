@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from datetime import datetime
 
 import aiosqlite
@@ -139,17 +140,24 @@ class SqliteAlertRepository:
             return [_from_row(row) for row in await cur.fetchall()]
 
     async def update(self, alert: Alert) -> Alert:
+        await self.update_many([alert])
+        return alert
+
+    async def update_many(self, alerts: Sequence[Alert]) -> None:
+        """Persist a batch of alerts in one transaction (one commit, not N)."""
+        if not alerts:
+            return
         conn = await self._connect()
-        cur = await conn.execute(
+        cur = await conn.executemany(
             "UPDATE alerts SET symbol=?, conditions=?, match_mode=?, trigger_mode=?,"
             " expires_at=?, message=?, notification_channels=?, status=?,"
             " created_at=?, triggered_at=?, last_evaluated_at=? WHERE id=?",
-            (*_to_row(alert)[1:], alert.id),
+            [(*_to_row(alert)[1:], alert.id) for alert in alerts],
         )
-        if cur.rowcount == 0:
-            raise AlertNotFound(alert.id)
+        if cur.rowcount != len(alerts):
+            await conn.rollback()
+            raise AlertNotFound(f"{len(alerts)} alert(s), {cur.rowcount} matched")
         await conn.commit()
-        return alert
 
     async def delete(self, alert_id: str) -> None:
         conn = await self._connect()
