@@ -1,5 +1,7 @@
 # trading-tui
 
+![trading-tui live market desk](trading-tui.png)
+
 A modular, reactive terminal UI application built with Textual and FastAPI that
 provides real-time market monitoring, candlestick rendering, technical
 indicators, and **price alerts** directly from your favorite CLI tool. Built
