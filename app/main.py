@@ -31,7 +31,7 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(
         title="Trading TUI API",
-        version="0.2.1",
+        version="0.2.2",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=_lifespan,

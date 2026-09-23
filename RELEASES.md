@@ -31,6 +31,14 @@ mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
   `POST /alerts/evaluate` only).
 - Linter / type checker / CI.
 
+## [0.2.2] - 2026-09-23
+
+### Added
+
+- `OSSMETADATA` declaring `osslifecycle=maintained`.
+- README badge row (Python, license, lifecycle, tests, FastAPI, Textual,
+  Discord) in `for-the-badge` style, each with its logo.
+
 ## [0.2.1] - 2026-09-23
 
 ### Fixed
@@ -150,7 +158,8 @@ Initial release.
   repositories, the REST surface, notification delivery, settings, and TUI
   flows via Textual's pilot.
 
-[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/corderkrow/trading-tui/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/corderkrow/trading-tui/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/corderkrow/trading-tui/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/corderkrow/trading-tui/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/corderkrow/trading-tui/releases/tag/0.1.0
