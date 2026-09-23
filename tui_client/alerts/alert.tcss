@@ -1,0 +1,306 @@
+/* Multi-condition alert dialog — TradingView-style.
+   Colors come from the active Textual theme (default: coderkrow dark,
+   tui_client/themes.py). No raw hex here — brand rule: tokens only. */
+
+AlertScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+AlertScreen #dialog {
+    width: 64;
+    height: auto;
+    max-height: 90%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 0 2;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+AlertScreen #header {
+    height: 3;
+    align-vertical: middle;
+}
+AlertScreen #title {
+    width: auto;
+    text-style: bold;
+    padding-right: 1;
+}
+AlertScreen #symbol {
+    width: 18;
+}
+AlertScreen .spacer {
+    width: 1fr;
+}
+AlertScreen .icon {
+    min-width: 3;
+    width: 3;
+    border: none;
+    background: transparent;
+    color: $text-muted;
+}
+AlertScreen .icon:hover {
+    color: $foreground;
+    background: transparent;
+}
+
+/* ── Body ───────────────────────────────────────────── */
+AlertScreen #body {
+    height: auto;
+    max-height: 60vh;
+}
+AlertScreen .section {
+    grid-size: 2;
+    grid-columns: 14 1fr;
+    border-top: solid $panel;
+    padding: 1 0;
+    height: auto;
+}
+AlertScreen .label {
+    width: 14;
+    height: 3;
+    color: $text-muted;
+    content-align: left middle;
+}
+AlertScreen Select,
+AlertScreen Input {
+    width: 1fr;
+}
+AlertScreen #value_type {
+    width: 16;
+}
+
+AlertScreen #condition-controls,
+AlertScreen #condition-inline,
+AlertScreen #condition-list,
+AlertScreen .value-row,
+AlertScreen .add-row {
+    height: auto;
+}
+AlertScreen .link {
+    color: $secondary;
+    background: transparent;
+    border: none;
+    min-width: 0;
+    width: auto;
+    height: 3;
+}
+AlertScreen .link:hover {
+    color: $accent;
+    background: transparent;
+}
+AlertScreen #add_condition:disabled {
+    color: $text-muted;
+}
+AlertScreen .help {
+    width: 3;
+    height: 3;
+    color: $text-muted;
+    content-align: center middle;
+}
+AlertScreen #timeframe-hint {
+    color: $text-muted;
+    height: 1;
+    padding-left: 1;
+}
+
+/* ── Condition rows (Mode B) ────────────────────────── */
+ConditionRow {
+    height: 3;
+}
+ConditionRow .preview {
+    width: 1fr;
+    text-align: left;
+    content-align: left middle;
+    background: transparent;
+    border: tall $panel;
+}
+ConditionRow .preview:focus {
+    border: tall $accent;
+}
+ConditionRow .remove {
+    width: 5;
+    min-width: 5;
+    background: transparent;
+    border: none;
+    color: $text-muted;
+}
+ConditionRow .remove:hover {
+    color: $error;
+}
+.and-sep {
+    color: $text-muted;
+    text-align: center;
+    height: 1;
+    width: 1fr;
+}
+
+AlertScreen .row-link {
+    background: transparent;
+    border: none;
+    text-align: left;
+    width: 1fr;
+    height: 3;
+    color: $foreground;
+}
+AlertScreen .row-link:hover {
+    color: $secondary;
+    background: transparent;
+}
+
+/* ── Footer ─────────────────────────────────────────── */
+AlertScreen #footer {
+    height: 5;
+    border-top: solid $panel;
+    align-horizontal: right;
+    padding-top: 1;
+}
+AlertScreen #footer Button {
+    margin-left: 2;
+}
+AlertScreen #cancel {
+    background: transparent;
+    border: solid $secondary;
+    color: $secondary;
+}
+AlertScreen #cancel:hover {
+    background: $secondary 20%;
+}
+
+/* ── Condition editor ───────────────────────────────── */
+ConditionEditorScreen {
+    align: center middle;
+    background: $background 60%;
+}
+ConditionEditorScreen #condition-editor {
+    width: 52;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+ConditionEditorScreen #condition-editor-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+ConditionEditorScreen #condition-editor-fields {
+    grid-size: 2;
+    grid-columns: 14 1fr;
+    height: auto;
+}
+ConditionEditorScreen .label {
+    height: 3;
+    color: $text-muted;
+    content-align: left middle;
+}
+ConditionEditorScreen Select,
+ConditionEditorScreen Input {
+    width: 1fr;
+}
+ConditionEditorScreen #condition-editor-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+ConditionEditorScreen #condition-editor-actions Button {
+    margin-left: 2;
+}
+ConditionEditorScreen #editor-delete {
+    background: transparent;
+    border: solid $error;
+    color: $error;
+}
+ConditionEditorScreen #editor-delete:hover {
+    background: $error 20%;
+}
+
+/* ── Message sub-screen ─────────────────────────────── */
+MessageScreen {
+    align: center middle;
+    background: $background 60%;
+}
+MessageScreen #message-dialog {
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+MessageScreen #message-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+MessageScreen #message-text {
+    height: 10;
+    border: solid $panel;
+}
+MessageScreen #message-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+MessageScreen #message-actions Button {
+    margin-left: 2;
+}
+
+/* ── Notifications sub-screen ───────────────────────── */
+NotificationsScreen {
+    align: center middle;
+    background: $background 60%;
+}
+NotificationsScreen #notifications-dialog {
+    width: 48;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+NotificationsScreen #notifications-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+NotificationsScreen #notifications-list {
+    height: auto;
+    max-height: 12;
+}
+NotificationsScreen #notifications-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+NotificationsScreen #notifications-actions Button {
+    margin-left: 2;
+}
+
+/* ── Expiration sub-screen ──────────────────────────── */
+ExpirationScreen {
+    align: center middle;
+    background: $background 60%;
+}
+ExpirationScreen #expiration-dialog {
+    width: 48;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+ExpirationScreen #expiration-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+ExpirationScreen #expiration-list {
+    height: auto;
+    max-height: 12;
+}
+ExpirationScreen #expiration-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+ExpirationScreen #expiration-actions Button {
+    margin-left: 2;
+}
