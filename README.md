@@ -1,5 +1,13 @@
 # trading-tui
 
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![Lifecycle](https://img.shields.io/badge/lifecycle-maintained-brightgreen.svg?style=for-the-badge&logo=shieldsdotio&logoColor=white)](OSSMETADATA)
+[![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC.svg?style=for-the-badge&logo=pytest&logoColor=white)](tests)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Textual](https://img.shields.io/badge/Textual-0.85%2B-5A3FC0.svg?style=for-the-badge&logo=textual&logoColor=white)](https://textual.textualize.io/)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/JEJCUJefMk)
+
 ![trading-tui live market desk](trading-tui.png)
 
 A modular, reactive terminal UI application built with Textual and FastAPI that
