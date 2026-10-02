@@ -7,6 +7,8 @@ from typing import Protocol
 
 import httpx
 
+from tui_client.themes import DANGER, INK, MUTED, SUCCESS
+
 
 class ApiError(Exception):
     """Raised on non-2xx responses; carries the server detail message."""
@@ -70,6 +72,8 @@ class AlertView:
     conditions: list[dict] = field(default_factory=list)
     message: str = ""
     expires_at: str | None = None
+    trigger_mode: str = "ONCE"
+    notification_channels: list[str] = field(default_factory=list)
 
     @classmethod
     def from_json(cls, data: dict) -> "AlertView":
@@ -80,6 +84,8 @@ class AlertView:
             conditions=data.get("conditions", []),
             message=data.get("message", ""),
             expires_at=data.get("expires_at"),
+            trigger_mode=data.get("trigger_mode", "ONCE"),
+            notification_channels=data.get("notification_channels", []),
         )
 
     def condition_text(self) -> str:
@@ -118,12 +124,29 @@ class CandleView:
         )
 
     def ohlc_text(self) -> str:
+        """Compact OHLC line — dim labels, ink values, colored open→close delta."""
         sym = currency_symbol()
-        o, h, l, c = (f"{sym}{QuoteView._compact(v)}" for v in (self.open, self.high, self.low, self.close))
+        o, h, l, c = (
+            f"{sym}{QuoteView._compact(v)}"
+            for v in (self.open, self.high, self.low, self.close)
+        )
         change = self.close - self.open
         pct = change / self.open * 100 if self.open else 0.0
-        style = "green" if change >= 0 else "red"
-        return f"O: {o} H: {h} L: {l} C: {c} [{style}]{sym}{change:+,.2f} ({pct:+.2f}%)[/]"
+        color, arrow = (SUCCESS, "▲") if change >= 0 else (DANGER, "▼")
+        sign = "+" if change >= 0 else "-"
+        delta = f"{sign}{sym}{QuoteView._compact(abs(change))}"
+
+        def label(text: str) -> str:
+            return f"[{MUTED}]{text}[/]"
+
+        def value(text: str) -> str:
+            return f"[{INK}]{text}[/]"
+
+        return (
+            f"{label('O')} {value(o)}  {label('H')} {value(h)}  "
+            f"{label('L')} {value(l)}  {label('C')} {value(c)}  "
+            f"[{color}]{arrow} {delta} ({pct:+.2f}%)[/]"
+        )
 
 
 @dataclass
@@ -230,12 +253,36 @@ class QuoteView:
 class AlertApiClient(Protocol):
     async def list_alerts(self) -> list[AlertView]: ...
     async def create_alert(self, payload: dict) -> AlertView: ...
+    async def update_alert(self, alert_id: str, payload: dict) -> AlertView: ...
     async def delete_alert(self, alert_id: str) -> None: ...
     async def enable_alert(self, alert_id: str) -> AlertView: ...
     async def disable_alert(self, alert_id: str) -> AlertView: ...
     async def get_last_candle(self, symbol: str) -> CandleView | None: ...
     async def get_news(self, symbol: str, limit: int = 10) -> list[NewsItemView]: ...
     async def search_symbols(self, query: str, limit: int = 10) -> list[SearchHitView]: ...
+    async def list_events(self, limit: int = 50) -> list[AlertEventView]: ...
+
+
+@dataclass
+class AlertEventView:
+    """UI representation of one fired alert event (newest-first feed)."""
+
+    alert_id: str
+    symbol: str
+    message: str
+    triggered_at: str
+
+    @classmethod
+    def from_json(cls, data: dict) -> "AlertEventView":
+        return cls(
+            alert_id=data["alert_id"],
+            symbol=data["symbol"],
+            message=data.get("message", ""),
+            triggered_at=data.get("triggered_at", ""),
+        )
+
+    def time_text(self) -> str:
+        return self.triggered_at[:16].replace("T", " ") if self.triggered_at else "—"
 
 
 class HttpAlertApi:
@@ -256,11 +303,19 @@ class HttpAlertApi:
         data = await self._request("POST", "/alerts", json=payload)
         return AlertView.from_json(data)
 
+    async def update_alert(self, alert_id: str, payload: dict) -> AlertView:
+        data = await self._request("PUT", f"/alerts/{alert_id}", json=payload)
+        return AlertView.from_json(data)
+
     async def delete_alert(self, alert_id: str) -> None:
         await self._request("DELETE", f"/alerts/{alert_id}")
 
     async def enable_alert(self, alert_id: str) -> AlertView:
         return AlertView.from_json(await self._request("POST", f"/alerts/{alert_id}/enable"))
+
+    async def list_events(self, limit: int = 50) -> list[AlertEventView]:
+        data = await self._request("GET", f"/alerts/events?limit={limit}")
+        return [AlertEventView.from_json(item) for item in data]
 
     async def disable_alert(self, alert_id: str) -> AlertView:
         return AlertView.from_json(await self._request("POST", f"/alerts/{alert_id}/disable"))
@@ -303,7 +358,10 @@ class HttpAlertApi:
         return [NewsItemView.from_json(item) for item in data]
 
     async def _request(self, method: str, path: str, **kwargs):
-        resp = await self._client.request(method, path, **kwargs)
+        try:
+            resp = await self._client.request(method, path, **kwargs)
+        except httpx.HTTPError as exc:
+            raise ApiError(f"Request failed: {exc}") from exc
         if resp.status_code >= 400:
             detail = resp.json().get("detail", resp.text) if resp.content else resp.text
             raise ApiError(str(detail), resp.status_code)

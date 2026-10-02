@@ -66,6 +66,25 @@ class AlertService:
         )
         return await self.repository.create(alert)
 
+    async def update(self, alert_id: str, request: CreateAlertRequest) -> Alert:
+        alert = await self.repository.get(alert_id)
+        unknown = set(request.notification_channels) - self.notifications.channel_names
+        if unknown:
+            raise InvalidAlertConfiguration(
+                f"Unknown notification channel(s): {', '.join(sorted(unknown))}"
+            )
+        alert.symbol = request.symbol
+        alert.conditions = [c.to_spec() for c in request.conditions]
+        alert.match_mode = request.match_mode
+        alert.trigger_mode = request.trigger_mode
+        alert.expires_at = request.expires_at
+        alert.message = request.message or self._default_message(request)
+        alert.notification_channels = list(request.notification_channels)
+        # Editing re-arms: an expired/triggered alert becomes active again.
+        alert.status = AlertStatus.ACTIVE
+        alert.triggered_at = None
+        return await self.repository.update(alert)
+
     async def get(self, alert_id: str) -> Alert:
         alert = await self.repository.get(alert_id)
         if self._is_expired(alert, self._clock()):
@@ -109,6 +128,9 @@ class AlertService:
         for alert in await self.repository.list():
             if alert.status is not AlertStatus.ACTIVE:
                 continue
+            if alert.symbol != symbol:
+                # Alerts only react to ticks for their own symbol.
+                continue
             if self._is_expired(alert, now):
                 alert.status = AlertStatus.EXPIRED
             elif await self._matches(alert, symbol, price, now):
@@ -132,6 +154,44 @@ class AlertService:
             alert = await self.repository.get(event.alert_id)
             await self.notifications.dispatch(alert, event)
         return triggered
+
+    async def active_symbols(self) -> set[str]:
+        """Symbols holding alerts that may still need evaluation or sweeping.
+
+        Includes ACTIVE (needs ticks now) and DISABLED (may be re-enabled via
+        the API) alerts. Expired-but-still-ACTIVE rows are kept too: the
+        evaluator sweeps them to persist their EXPIRED status even when no
+        tick arrives. Triggered/expired alerts cannot fire again unless
+        edited, and editing re-reads this set on the next poll cycle.
+        """
+        alerts = await self.repository.list()
+        return {
+            a.symbol
+            for a in alerts
+            if a.status in (AlertStatus.ACTIVE, AlertStatus.DISABLED)
+        }
+
+    async def sweep_symbol(self, symbol: str) -> int:
+        """Persist status changes for one symbol's alerts (no re-kick).
+
+        Used by the background evaluator for symbols whose last poll dropped
+        them; keeps expiry truthful without new ticks.
+        """
+        now = self._clock()
+        alerts = await self.repository.list()
+        stale = [
+            a
+            for a in alerts
+            if a.symbol == symbol
+            and a.status is AlertStatus.ACTIVE
+            and a.expires_at is not None
+            and a.expires_at <= now
+        ]
+        for alert in stale:
+            alert.status = AlertStatus.EXPIRED
+        if stale:
+            await self.repository.update_many(stale)
+        return len(stale)
 
     async def _matches(self, alert: Alert, symbol: str, price: float, now: datetime) -> bool:
         previous_price = self._previous_prices.get(symbol)

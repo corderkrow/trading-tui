@@ -68,6 +68,36 @@ async def test_delete_alert():
         assert (await client.get(f"/alerts/{alert_id}")).status_code == 404
 
 
+async def test_update_alert_replaces_fields_and_rearms():
+    async with make_client() as client:
+        alert_id = (await client.post("/alerts", json=payload())).json()["id"]
+        await client.post(f"/alerts/{alert_id}/disable")
+
+        updated = await client.put(
+            f"/alerts/{alert_id}",
+            json=payload(
+                symbol=" btcusdt ",
+                conditions=[{"operator": "below", "value": 42.0}],
+                message="custom",
+            ),
+        )
+        assert updated.status_code == 200
+        body = updated.json()
+        assert body["id"] == alert_id
+        assert body["symbol"] == "BTCUSDT"
+        assert body["conditions"] == [
+            {"metric": "price", "operator": "below", "value": 42.0}
+        ]
+        assert body["message"] == "custom"
+        assert body["status"] == "ACTIVE"
+
+
+async def test_update_missing_alert_returns_404():
+    async with make_client() as client:
+        resp = await client.put("/alerts/does-not-exist", json=payload())
+        assert resp.status_code == 404
+
+
 async def test_get_missing_alert_returns_404():
     async with make_client() as client:
         resp = await client.get("/alerts/does-not-exist")

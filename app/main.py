@@ -11,6 +11,7 @@ from app.router.alerts import router as alerts_router
 from app.router.market_data import router as market_router
 from app.services.adapters import get_adapter
 from app.services.adapters.base import MarketDataAdapter
+from app.services.alerts.evaluator import BackgroundAlertEvaluator
 from app.services.alerts.service import AlertService
 from app.services.alerts.sqlite_repository import SqliteAlertRepository
 from app.services.notifications import NotificationService
@@ -19,8 +20,11 @@ from app.services.user_prefs import allowed_channels
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    """Release the shared market-data adapter (and its connection pool) on exit."""
+    """Lifespan for the module-level singleton app."""
     yield
+    evaluator: BackgroundAlertEvaluator | None = getattr(app.state, "alert_evaluator", None)
+    if evaluator is not None:
+        await evaluator.stop()
     adapter: MarketDataAdapter = app.state.market_adapter
     await adapter.close()
 
@@ -28,6 +32,7 @@ async def _lifespan(app: FastAPI):
 def create_app(
     alert_service: AlertService | None = None,
     adapter: MarketDataAdapter | None = None,
+    enable_evaluator: bool | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Trading TUI API",
@@ -41,9 +46,57 @@ def create_app(
         repository=SqliteAlertRepository(settings.ALERTS_DB_PATH),
         notifications=NotificationService(delivery_filter=allowed_channels),
     )
+    app.state.notification_channels = app.state.alert_service.notifications.channels
     # One adapter per process: reuses the HTTP connection pool, the Yahoo
     # crumb/cookie pair, and avoids leaking a client per request.
     app.state.market_adapter = adapter or get_adapter(settings.ADAPTER_NAME)
+    # Stored alerts must fire without a client pushing prices: poll the
+    # adapter for their symbols and evaluate on a fixed cadence. Custom
+    # alert_service (tests) opts out unless enable_evaluator=True is explicit.
+def create_app(
+    alert_service: AlertService | None = None,
+    adapter: MarketDataAdapter | None = None,
+    enable_evaluator: bool | None = None,
+) -> FastAPI:
+    app = FastAPI(
+        title="Trading TUI API",
+        version="0.2.3",
+        docs_url="/docs",
+        redoc_url="/redoc",
+    )
+    register_exception_handlers(app)
+    app.state.alert_service = alert_service or AlertService(
+        repository=SqliteAlertRepository(settings.ALERTS_DB_PATH),
+        notifications=NotificationService(delivery_filter=allowed_channels),
+    )
+    app.state.notification_channels = app.state.alert_service.notifications.channels
+    # One adapter per process: reuses the HTTP connection pool, the Yahoo
+    # crumb/cookie pair, and avoids leaking a client per request.
+    app.state.market_adapter = adapter or get_adapter(settings.ADAPTER_NAME)
+    # Stored alerts must fire without a client pushing prices: poll the
+    # adapter for their symbols and evaluate on a fixed cadence. Custom
+    # alert_service (tests) opts out unless enable_evaluator=True is explicit.
+    if enable_evaluator is None:
+        enable_evaluator = alert_service is None
+    evaluator = None
+    if enable_evaluator:
+        evaluator = BackgroundAlertEvaluator(
+            app.state.alert_service, app.state.market_adapter
+        )
+        app.state.alert_evaluator = evaluator
+
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        if evaluator is not None:
+            evaluator.start()
+        try:
+            yield
+        finally:
+            if evaluator is not None:
+                await evaluator.stop()
+            await app.state.market_adapter.close()
+
+    app.router.lifespan_context = _lifespan
     app.include_router(market_router)
     app.include_router(alerts_router)
     return app

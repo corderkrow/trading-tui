@@ -69,3 +69,43 @@ def test_alert_spec_holds_condition_list():
         notifications=["App"],
     )
     assert spec.conditions == [condition]
+
+
+def test_payload_round_trip_through_view():
+    from datetime import datetime, timedelta
+
+    from tui_client.api import AlertView
+
+    spec = AlertSpec(
+        symbol="btcusdt",
+        conditions=[Condition("Price", "Greater than", "Value", 100.0)],
+        trigger="Once only",
+        expires_at=datetime.now().astimezone() + timedelta(days=1),
+        message="BTCUSDT Above 100",
+        notifications=["App", "Toasts"],
+    )
+    payload = spec.to_payload()
+    assert payload["symbol"] == "BTCUSDT"
+    assert payload["conditions"] == [
+        {"metric": "price", "operator": "above", "value": 100.0}
+    ]
+    assert payload["trigger_mode"] == "ONCE"
+    assert payload["notification_channels"] == ["in_app", "toast"]
+
+    view = AlertView(
+        id="a1",
+        symbol="BTCUSDT",
+        status="ACTIVE",
+        conditions=payload["conditions"],
+        message=payload["message"] or "",
+        expires_at=payload["expires_at"],
+        trigger_mode=payload["trigger_mode"],
+        notification_channels=payload["notification_channels"],
+    )
+    rebuilt = AlertSpec.from_view(view)
+    assert rebuilt.symbol == "BTCUSDT"
+    assert rebuilt.conditions[0].operator == "Greater than"
+    assert rebuilt.conditions[0].value == 100.0
+    assert rebuilt.trigger == "Once only"
+    assert rebuilt.notifications == ["App", "Toasts"]
+    assert rebuilt.to_payload()["conditions"] == payload["conditions"]

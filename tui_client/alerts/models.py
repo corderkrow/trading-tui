@@ -16,7 +16,7 @@ Rules encoded here:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 MAX_CONDITIONS = 5
@@ -44,6 +44,43 @@ TRIGGERS = ["Once only", "Once per bar", "Once per bar close", "Once per minute"
 NOTIFICATIONS = ["App", "Toasts", "Sound", "Email", "Webhook"]
 DEFAULT_NOTIFICATIONS = ["App", "Toasts", "Sound"]
 
+# UI intent -> backend vocabulary. The multi-condition editor ships ahead of the
+# evaluator, which only tracks price / percent-change metrics, so every source
+# approximates to a price metric (same reduction the legacy dialog used).
+OPERATOR_BACKEND: dict[str, tuple[str, str]] = {
+    "Crossing": ("crossing", "price"),
+    "Crossing up": ("crossing", "price"),
+    "Crossing down": ("crossing", "price"),
+    "Greater than": ("above", "price"),
+    "Less than": ("below", "price"),
+}
+TRIGGER_BACKEND = {
+    "Once only": "ONCE",
+    "Once per bar": "EVERY_TIME",
+    "Once per bar close": "EVERY_TIME",
+    "Once per minute": "EVERY_TIME",
+}
+NOTIFICATION_BACKEND = {
+    "App": "in_app",
+    "Toasts": "toast",
+    "Sound": "sound",
+    "Email": "email",
+    "Webhook": "webhook",
+}
+
+# Backend -> UI (used when editing an existing alert back into the dialog).
+OPERATOR_UI: dict[tuple[str, str], str] = {
+    ("crossing", "price"): "Crossing",
+    ("above", "price"): "Greater than",
+    ("below", "price"): "Less than",
+    ("rises_by", "change_pct"): "Greater than",
+    ("falls_by", "change_pct"): "Less than",
+    ("turns_positive", "price"): "Crossing up",
+    ("turns_negative", "price"): "Crossing down",
+}
+TRIGGER_UI = {"ONCE": "Once only", "EVERY_TIME": "Once per bar"}
+NOTIFICATION_UI = {backend: ui for ui, backend in NOTIFICATION_BACKEND.items()}
+
 
 def format_value(value: float | None) -> str:
     """Human-readable numeric value; ``—`` when the condition has none."""
@@ -69,6 +106,24 @@ class Condition:
         """Preview without the timeframe, used in the default alert message."""
         return f"{self.source} {self.operator} {format_value(self.value)}"
 
+    def to_payload(self) -> dict:
+        """Translate into the backend ``ConditionRequest`` shape."""
+        operator, metric = OPERATOR_BACKEND.get(self.operator, ("crossing", "price"))
+        return {"metric": metric, "operator": operator, "value": self.value}
+
+    @classmethod
+    def from_payload(cls, data: dict) -> "Condition":
+        """Rebuild a UI condition from a backend condition dict."""
+        metric = data.get("metric", "price")
+        operator = data.get("operator", "crossing")
+        value = data.get("value")
+        return cls(
+            source="Price",
+            operator=OPERATOR_UI.get((operator, metric), "Crossing"),
+            value_type="Value" if value is not None else "Indicator",
+            value=float(value) if value is not None else None,
+        )
+
 
 @dataclass
 class AlertSpec:
@@ -84,3 +139,49 @@ class AlertSpec:
     expires_at: datetime
     message: str
     notifications: list[str]
+
+    def to_payload(self) -> dict:
+        """Translate into the backend ``CreateAlertRequest`` shape."""
+        return {
+            "symbol": self.symbol.strip().upper(),
+            "conditions": [condition.to_payload() for condition in self.conditions],
+            "match_mode": "ALL",
+            "trigger_mode": TRIGGER_BACKEND.get(self.trigger, "ONCE"),
+            "expires_at": self.expires_at.isoformat(),
+            "message": self.message or None,
+            "notification_channels": [
+                NOTIFICATION_BACKEND[name]
+                for name in self.notifications
+                if name in NOTIFICATION_BACKEND
+            ],
+        }
+
+    @classmethod
+    def from_view(cls, view) -> "AlertSpec":
+        """Rebuild a dialog spec from an ``AlertView`` (used to edit alerts)."""
+        conditions = [Condition.from_payload(c) for c in view.conditions]
+        if not conditions:
+            conditions = [
+                Condition(source="Price", operator="Crossing", value_type="Value", value=None)
+            ]
+        expires = None
+        if view.expires_at:
+            try:
+                expires = datetime.fromisoformat(view.expires_at)
+            except ValueError:
+                expires = None
+        if expires is None:
+            expires = datetime.now().astimezone() + timedelta(days=30)
+        notifications = [
+            NOTIFICATION_UI[name]
+            for name in view.notification_channels
+            if name in NOTIFICATION_UI
+        ] or list(DEFAULT_NOTIFICATIONS)
+        return cls(
+            symbol=view.symbol,
+            conditions=conditions,
+            trigger=TRIGGER_UI.get(view.trigger_mode, "Once only"),
+            expires_at=expires,
+            message=view.message,
+            notifications=notifications,
+        )

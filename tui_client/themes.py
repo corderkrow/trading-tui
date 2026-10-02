@@ -9,18 +9,20 @@ from __future__ import annotations
 
 from textual.theme import Theme
 
-# Brand tokens (dark variant)
-INK = "#e8e6df"  # warm off-white — primary text (--ck-ink, dark)
-BG = "#111110"  # near-black — app background (--ck-bg, dark)
-SURFACE = "#1a1a18"  # panels, inputs, modals (--ck-surface, dark)
-MUTED = "#888780"  # secondary text, captions (--ck-muted, dark)
-TEAL = "#1a595a"  # brand accent (--ck-teal)
-TEAL_MID = "#2e7f80"  # interactive elements, hover (--ck-teal-mid)
-TEAL_LIGHT = "#3bb8ba"  # badges, highlights, inline accents (--ck-teal-light)
-CYAN = "#00d1d4"  # signal only: active/on states, focus (--ck-cyan)
-DANGER = "#c83c3c"  # destructive/error (brand.html "don't" red)
-WARNING = "#fabd2f"  # functional warning amber — no brand token exists
-PANEL = "#1a1f1d"  # permitted derivation: --ck-teal at 8% over surface
+# Brand tokens (dark variant) — desk v2: same teal/cyan hues, lower chroma,
+# lifted ground. Tuned for long sessions (halation + contrast fatigue).
+INK = "#d8d6cf"  # warm off-white — primary text (--ck-ink, dark)
+BG = "#191a18"  # lifted graphite — app background (--ck-bg, dark)
+SURFACE = "#212220"  # panels, inputs, modals (--ck-surface, dark)
+MUTED = "#8b8a83"  # secondary text, captions (--ck-muted, dark)
+TEAL = "#1a595a"  # brand accent (--ck-teal) — hue unchanged
+TEAL_MID = "#3f9a99"  # interactive elements, hover (--ck-teal-mid)
+TEAL_LIGHT = "#57bcbb"  # badges, highlights, inline accents (--ck-teal-light)
+CYAN = "#5fc9c7"  # signal only: active/on states, focus (--ck-cyan)
+DANGER = "#e0918a"  # destructive/down — AA on dark (was #c83c3c, 3.75:1)
+SUCCESS = "#6fbf8b"  # up/success — luminance-matched to DANGER
+WARNING = "#d9a441"  # functional warning amber — no brand token exists
+PANEL = "#1e2321"  # permitted derivation: --ck-teal at 8% over surface
 
 CODERKROW_DARK = Theme(
     name="coderkrow dark",
@@ -33,7 +35,7 @@ CODERKROW_DARK = Theme(
     panel=PANEL,
     error=DANGER,
     warning=WARNING,
-    success=TEAL_LIGHT,
+    success=SUCCESS,
     dark=True,
     variables={
         "text": INK,
@@ -52,5 +54,6 @@ __all__ = [
     "TEAL_LIGHT",
     "CYAN",
     "DANGER",
+    "SUCCESS",
     "WARNING",
 ]

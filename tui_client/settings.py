@@ -45,6 +45,10 @@ class WatchlistSettings(BaseModel):
         return self
 
     def active_symbols(self) -> list[str]:
+        if self.active not in self.watchlists:
+            if not self.watchlists:
+                return []
+            self.active = next(iter(self.watchlists))
         return self.watchlists[self.active]
 
 

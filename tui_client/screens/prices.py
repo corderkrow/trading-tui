@@ -10,13 +10,13 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Footer, Input, Label, Static, Tab, Tabs
+from textual.widgets import Button, DataTable, Footer, Input, Label, Select, Static, Tab, Tabs
 
-from tui_client.widgets import BannerHeader
+from tui_client.widgets import BannerHeader, SymbolAutoComplete
 
-from tui_client.api import AlertApiClient, ApiError, CandleView, QuoteView
+from tui_client.api import AlertApiClient, ApiError, CandleView, QuoteView, SearchHitView
 from tui_client.screens.symbol_info import SymbolInfoScreen
-from tui_client.themes import CYAN, DANGER, INK, MUTED, TEAL_LIGHT, WARNING
+from tui_client.themes import BG, CYAN, DANGER, INK, MUTED, SUCCESS, TEAL_LIGHT, WARNING
 
 DEFAULT_WATCHLIST = ["BTC-USD", "ETH-USD", "SOL-USD", "AAPL", "TSLA", "NVDA"]
 
@@ -59,12 +59,41 @@ ALERT_STATE_LABELS = {
 
 SYMBOL_COLOR = TEAL_LIGHT
 
-ALERT_STATE_COLORS = {
-    "armed": CYAN,
-    "triggered": WARNING,
-    "expired": DANGER,
-    "idle": MUTED,
+# Filled pill per state — (foreground, background). A background fill reads
+# faster than coloured text alone, so armed / triggered / expired / idle stay
+# distinct even when rows sit next to each other.
+ALERT_STATE_BADGES = {
+    "armed": (BG, CYAN),
+    "triggered": (BG, WARNING),
+    "expired": (BG, DANGER),
+    "idle": (BG, MUTED),
 }
+
+
+def alert_state_badge(label: str, text: str | None = None) -> str:
+    """Filled pill for a UI state label; `text` overrides the displayed word."""
+    fg, bg = ALERT_STATE_BADGES.get(label, (INK, MUTED))
+    return f"[{fg} on {bg}]{text if text is not None else label}[/]"
+
+
+def alert_symbol_cell(symbol: str) -> str:
+    """Ticker cell — brand accent, matching prices-table symbols."""
+    return f"[{SYMBOL_COLOR}]{symbol}[/]"
+
+
+def alert_condition_cell(text: str) -> str:
+    """Operator label — muted; the target value carries the row's emphasis."""
+    return f"[{MUTED}]{text}[/]"
+
+
+def alert_target_cell(text: str) -> str:
+    """Trigger value — bold ink, the number the alert fires on."""
+    return f"[bold]{text}[/]"
+
+
+def alert_meta_cell(text: str) -> str:
+    """Message / expiry — muted secondary text."""
+    return f"[{MUTED}]{text}[/]"
 
 CHANGE_FILTERS: dict[str, tuple[str, str | None]] = {
     "f": ("All", None),
@@ -73,35 +102,196 @@ CHANGE_FILTERS: dict[str, tuple[str, str | None]] = {
 }
 
 
-class NewWatchlistModal(ModalScreen[str | None]):
+class NameModal(ModalScreen[str | None]):
     """Ask for a watchlist name; dismisses with the name or None."""
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
+    def __init__(
+        self,
+        title: str,
+        value: str = "",
+        submit_label: str = "Create",
+        placeholder: str = "watchlist name…",
+    ) -> None:
+        super().__init__()
+        self._title = title
+        self._value = value
+        self._submit_label = submit_label
+        self._placeholder = placeholder
+
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-body"):
-            yield Label("New watchlist", id="modal-title")
-            yield Input(placeholder="watchlist name…", id="wl-name")
+            yield Label(self._title, id="modal-title")
+            yield Input(value=self._value, placeholder=self._placeholder, id="wl-name")
             with Horizontal(id="modal-actions"):
                 yield Button("Cancel", id="cancel", variant="default")
-                yield Button("Create", id="create", variant="primary")
+                yield Button(self._submit_label, id="create", variant="primary")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "wl-name":
-            self._create()
+            self._submit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
             self.dismiss(None)
         elif event.button.id == "create":
-            self._create()
+            self._submit()
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
-    def _create(self) -> None:
+    def _submit(self) -> None:
         name = self.query_one("#wl-name", Input).value.strip()
         self.dismiss(name or None)
+
+
+class AddSymbolModal(ModalScreen[tuple[str, str] | None]):
+    """Pick a symbol and the watchlist to add it to; dismisses with (name, symbol).
+
+    Without ``allow_list_choice`` the watchlist is fixed to ``target`` and the
+    modal behaves as a plain symbol prompt.
+    """
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(
+        self,
+        api: AlertApiClient | None = None,
+        symbols: list[str] | None = None,
+        title: str = "Add symbol",
+        watchlists: list[str] | None = None,
+        target: str | None = None,
+        allow_list_choice: bool = False,
+    ) -> None:
+        super().__init__()
+        self._api = api
+        self._symbols = list(dict.fromkeys(symbols or []))
+        self._title = title
+        self._names = list(dict.fromkeys(watchlists or []))
+        self._target = target
+        self._allow_list_choice = allow_list_choice
+        self._autocomplete: SymbolAutoComplete | None = None
+        self._search_timer = None
+
+    def compose(self) -> ComposeResult:
+        symbol_input = Input(
+            placeholder="symbol…", id="wl-symbol", restrict=r"[A-Za-z0-9.\-]*"
+        )
+        with Vertical(id="modal-body"):
+            yield Label(self._title, id="modal-title")
+            yield symbol_input
+            if self._allow_list_choice:
+                yield Label("Add to watchlist", classes="field-label")
+                options = [(name, name) for name in self._names]
+                current = self._target or (self._names[0] if self._names else "")
+                yield Select(options, value=current or Select.BLANK, id="wl-target")
+            with Horizontal(id="modal-actions"):
+                yield Button("Cancel", id="cancel", variant="default")
+                yield Button("Add", id="add", variant="primary")
+        self._autocomplete = SymbolAutoComplete(
+            symbol_input, id="wl-symbol-autocomplete", on_selected=self._on_selected
+        )
+        yield self._autocomplete
+
+    def on_mount(self) -> None:
+        if self._autocomplete is not None:
+            self._autocomplete.set_hits(
+                [SearchHitView(symbol=s, name="") for s in self._symbols]
+            )
+        self.query_one("#wl-symbol", Input).focus()
+
+    def _on_selected(self, symbol: str) -> None:
+        if self._autocomplete is not None:
+            self._autocomplete.set_hits([])
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "wl-symbol":
+            return
+        if self._search_timer is not None:
+            self._search_timer.stop()
+            self._search_timer = None
+        term = event.value.strip()
+        if term:
+            self._search_timer = self.set_timer(
+                0.3, lambda: self.run_worker(self._search(term))
+            )
+
+    async def _search(self, term: str) -> None:
+        """Fetch symbol suggestions for the input from the search endpoint."""
+        self._search_timer = None
+        if self._api is None or self._autocomplete is None or not self.is_mounted:
+            return
+        try:
+            hits = await self._api.search_symbols(term)
+        except ApiError:
+            return
+        except Exception as exc:  # transport errors must not surface as a crash
+            self.log.warning(f"symbol search failed: {exc!r}")
+            return
+        if not self.is_mounted:
+            return
+        current = self.query_one("#wl-symbol", Input).value.strip()
+        if current != term:
+            return
+        local = [
+            SearchHitView(symbol=s, name="")
+            for s in self._symbols
+            if term.lower() in s.lower()
+        ]
+        self._autocomplete.set_hits([*hits, *local])
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "wl-symbol":
+            self._add()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(None)
+        elif event.button.id == "add":
+            self._add()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def _add(self) -> None:
+        symbol = self.query_one("#wl-symbol", Input).value.strip().upper()
+        if not symbol:
+            return
+        target = self._target
+        if self._allow_list_choice:
+            value = self.query_one("#wl-target", Select).value
+            target = value if isinstance(value, str) else self._names[0]
+        if not target:
+            return
+        self.dismiss((target, symbol))
+
+
+class ConfirmModal(ModalScreen[bool]):
+    """Yes/no confirmation; dismisses with True (confirm) or False."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, question: str, confirm_label: str = "Delete") -> None:
+        super().__init__()
+        self._question = question
+        self._confirm_label = confirm_label
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-body"):
+            yield Label(self._question, id="modal-title")
+            with Horizontal(id="modal-actions"):
+                yield Button("Cancel", id="cancel", variant="default")
+                yield Button(self._confirm_label, id="confirm", variant="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(False)
+        elif event.button.id == "confirm":
+            self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
 
 class PricesScreen(Screen[None]):
@@ -126,6 +316,14 @@ class PricesScreen(Screen[None]):
         Binding("u", "filter_up", "%UP"),
         Binding("d", "filter_down", "%DOWN"),
         Binding("n", "new_watchlist", "New list"),
+        Binding("e", "edit_watchlist", "Edit list"),
+        Binding("D", "delete_watchlist", "Del list"),
+        Binding("plus", "add_symbol", "+ Symbol"),
+        Binding("x", "remove_symbol", "- Symbol"),
+        Binding("delete", "remove_symbol", "- Symbol"),
+        Binding("backspace", "remove_symbol", "- Symbol"),
+        Binding("ctrl+h", "remove_symbol", "- Symbol"),
+        Binding("minus", "remove_symbol", "- Symbol"),
         Binding("tab", "next_list", "Next list"),
         Binding("ctrl+right", "next_watchlist", "Next watchlist"),
         Binding("/", "focus_search", "Search", priority=True),
@@ -225,7 +423,7 @@ class PricesScreen(Screen[None]):
         table.add_column("Name", width=20)
         table.add_column("Price", width=9)
         table.add_column("Chg %", width=8)
-        table.add_column("OHLC", width=58)
+        table.add_column("OHLC", width=64)
         table.add_column("Volume", width=10)
         table.add_column("Cap", width=10)
         table.add_column("Alert", width=10)
@@ -238,6 +436,21 @@ class PricesScreen(Screen[None]):
         if self._display is not None:
             self._start_refresh_timer()
             self._start_rotation_timer()
+
+    def on_key(self, event) -> None:
+        """Catch every terminal flavour of the delete key for symbol removal.
+
+        Terminals send different codes for the key labelled Delete/Backspace
+        (`delete`, `backspace`, `ctrl+h`, `minus`, shift/ctrl variants), so match
+        on the key name instead of binding each one individually.
+        """
+        if self.mode != "w":
+            return
+        key = event.key
+        if key == "minus" or "delete" in key or "backspace" in key or key == "ctrl+h":
+            event.stop()
+            event.prevent_default()
+            self.action_remove_symbol()
 
     def _update_tabs(self) -> None:
         tabs = self.query_one("#watchlist-tabs", Static)
@@ -332,11 +545,22 @@ class PricesScreen(Screen[None]):
         """Switch to `mode`, syncing the tab bar, label and data."""
         self._set_mode(mode)
 
+    def _reset_search(self) -> None:
+        """Drop the active search term and clear the search box."""
+        if self._search_timer is not None:
+            self._search_timer.stop()
+            self._search_timer = None
+        self._search = ""
+        self._server_search = False
+        if self.is_mounted and self.query("#search"):
+            self.query_one("#search", Input).value = ""
+
     def _set_mode(self, mode: str) -> None:
         if not self.is_mounted:
             self.prepare_mode(mode)
             return
         self.prepare_mode(mode)
+        self._reset_search()
         tabs = self.query_one("#mode-tabs", Tabs)
         if tabs.active != mode:
             tabs.active = mode
@@ -493,8 +717,16 @@ class PricesScreen(Screen[None]):
             self._search = event.value.strip().lower()
             self._page = 1
             if not self._search:
-                self._server_search = False
-                self._rebuild_table()
+                if self._search_timer is not None:
+                    self._search_timer.stop()
+                    self._search_timer = None
+                # A server search replaced `_quotes` with just the matches, so
+                # clearing must re-fetch the mode's full result set.
+                if self._server_search:
+                    self._server_search = False
+                    self.run_worker(self.reload())
+                else:
+                    self._rebuild_table()
                 return
             if self._search_timer is not None:
                 self._search_timer.stop()
@@ -567,8 +799,7 @@ class PricesScreen(Screen[None]):
         label = self._alert_states.get(symbol)
         if not label:
             return ""
-        color = ALERT_STATE_COLORS.get(label, INK)
-        return f"[{color}]{label}[/]"
+        return alert_state_badge(label)
 
     def _ohlc_cell(self, symbol: str) -> str:
         candle = self._candles.get(symbol)
@@ -578,8 +809,8 @@ class PricesScreen(Screen[None]):
     def _change_cell(quote: QuoteView) -> str:
         if quote.change_24h is None:
             return "—"
-        style = "green" if quote.change_24h >= 0 else "red"
-        return f"[{style}]{quote.change_text()}[/]"
+        color, arrow = (SUCCESS, "▲") if quote.change_24h >= 0 else (DANGER, "▼")
+        return f"[{color}]{arrow} {quote.change_text()}[/]"
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Open symbol info (click or Enter) with stats + latest news."""
@@ -657,7 +888,10 @@ class PricesScreen(Screen[None]):
                 severity="warning",
             )
             return
-        self.app.push_screen(NewWatchlistModal(), callback=self._on_new_watchlist)
+        self.app.push_screen(
+            NameModal("New watchlist", submit_label="Create"),
+            callback=self._on_new_watchlist,
+        )
 
     def _on_new_watchlist(self, name: str | None) -> None:
         if not name:
@@ -669,6 +903,154 @@ class PricesScreen(Screen[None]):
         if self.on_watchlist_change is not None:
             self.on_watchlist_change(name, [])
         self._switch_watchlist(name)
+
+    def action_edit_watchlist(self) -> None:
+        if self.watchlist_mode != "multiple":
+            self.notify(
+                "Watchlist mode is 'single' — enable multiple watchlists in settings.",
+                severity="warning",
+            )
+            return
+        self.app.push_screen(
+            NameModal(
+                "Rename watchlist",
+                value=self.active_watchlist,
+                submit_label="Rename",
+            ),
+            callback=self._on_edit_watchlist,
+        )
+
+    def _on_edit_watchlist(self, name: str | None) -> None:
+        old = self.active_watchlist
+        if not name or name == old:
+            return
+        if name in self.watchlists:
+            self.notify(f"Watchlist '{name}' already exists", severity="warning")
+            return
+        renamed = {
+            (name if key == old else key): list(symbols)
+            for key, symbols in self.watchlists.items()
+        }
+        self.watchlists = renamed
+        self.active_watchlist = name
+        self.watchlist = list(renamed[name])
+        if self.on_watchlist_change is not None:
+            self.on_watchlist_change(old, None)
+            self.on_watchlist_change(name, self.watchlist)
+        self.run_worker(self.reload())
+        self.notify(f"Renamed '{old}' to '{name}'")
+
+    def action_delete_watchlist(self) -> None:
+        if self.watchlist_mode != "multiple":
+            self.notify(
+                "Watchlist mode is 'single' — enable multiple watchlists in settings.",
+                severity="warning",
+            )
+            return
+        if len(self.watchlists) < 2:
+            self.notify("Cannot delete the last watchlist", severity="warning")
+            return
+        self.app.push_screen(
+            ConfirmModal(f"Delete watchlist '{self.active_watchlist}'?"),
+            callback=self._on_delete_watchlist,
+        )
+
+    def _on_delete_watchlist(self, confirmed: bool | None) -> None:
+        if not confirmed:
+            return
+        removed = self.active_watchlist
+        del self.watchlists[removed]
+        if self.on_watchlist_change is not None:
+            self.on_watchlist_change(removed, None)
+        self._switch_watchlist(next(iter(self.watchlists)))
+        self.notify(f"Deleted watchlist '{removed}'")
+
+    def _target_watchlist_for(self, symbol: str) -> str:
+        """First watchlist already holding ``symbol``; otherwise the active one."""
+        for name, symbols in self.watchlists.items():
+            if symbol in symbols:
+                return name
+        return self.active_watchlist
+
+    def _set_active_symbols(self, symbols: list[str]) -> None:
+        """Replace the active watchlist's symbols, persist, and reload the table."""
+        self.watchlists[self.active_watchlist] = list(symbols)
+        self.watchlist = list(symbols)
+        if self.on_watchlist_change is not None:
+            self.on_watchlist_change(self.active_watchlist, list(symbols))
+        self._page = 1
+        self.run_worker(self.reload())
+
+    def action_add_symbol(self) -> None:
+        if self.mode != "w":
+            self.notify("Switch to Watchlist to add a symbol", severity="warning")
+            return
+        self.app.push_screen(
+            AddSymbolModal(
+                self.api,
+                self.watchlist,
+                title="Add symbol",
+                watchlists=list(self.watchlists),
+                target=self.active_watchlist,
+                allow_list_choice=True,
+            ),
+            callback=self._on_add_symbol,
+        )
+
+    def _on_add_symbol(self, result: tuple[str, str] | None) -> None:
+        if not result:
+            return
+        name, symbol = result
+        symbol = symbol.strip().upper()
+        if not symbol:
+            return
+        if name not in self.watchlists:
+            self.notify(f"Watchlist '{name}' no longer exists", severity="warning")
+            return
+        if symbol in self.watchlists[name]:
+            self.notify(f"{symbol} already in {name}", severity="warning")
+            return
+        if name == self.active_watchlist:
+            self._set_active_symbols([*self.watchlist, symbol])
+        else:
+            updated = [*self.watchlists[name], symbol]
+            self.watchlists[name] = updated
+            if self.on_watchlist_change is not None:
+                self.on_watchlist_change(name, updated)
+            self.notify(f"Added {symbol} to {name}")
+
+    def _selected_symbol(self) -> str | None:
+        table = self.query_one("#prices-table", DataTable)
+        if table.row_count == 0:
+            return None
+        row_key, _ = table.coordinate_to_cell_key(table.cursor_coordinate)
+        return row_key.value or None
+
+    def action_remove_symbol(self) -> None:
+        if self.mode != "w":
+            self.notify("Switch to Watchlist to remove a symbol", severity="warning")
+            return
+        symbol = self._selected_symbol()
+        if not symbol:
+            return
+        # Remove from every watchlist that holds it, so a symbol shown in a
+        # search result can be dropped even when it lives on another list.
+        holders = [n for n, syms in self.watchlists.items() if symbol in syms]
+        if not holders:
+            self.notify(f"{symbol} not in any watchlist", severity="warning")
+            return
+        for name in holders:
+            self.watchlists[name] = [s for s in self.watchlists[name] if s != symbol]
+            if self.on_watchlist_change is not None:
+                self.on_watchlist_change(name, self.watchlists[name])
+        self.watchlist = list(self.watchlists[self.active_watchlist])
+        if self._server_search:
+            self._quotes = [q for q in self._quotes if q.symbol != symbol]
+            self._rebuild_table()
+        else:
+            self._page = 1
+            self.run_worker(self.reload())
+        self.notify(f"Removed {symbol} from {', '.join(holders)}")
 
     def action_show_screener(self) -> None:
         self._set_mode("s")

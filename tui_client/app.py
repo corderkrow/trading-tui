@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -84,11 +86,104 @@ DataTable > .datatable--hover {
     background: $surface;
 }
 
+/* ── Top-level tabs (Top / Gainers / … / Alerts) ────── */
 #mode-tabs {
+    height: 2;
     background: $surface;
+    border-bottom: solid $panel;
+    padding: 0 1;
 }
 
-/* ── Create-alert modal ─────────────────────────────── */
+/* Textual nests Tab under #tabs-list, so these must be descendant
+   selectors — a `> Tab` child selector matches nothing. */
+#mode-tabs Tab {
+    height: 1;
+    padding: 0 2;
+    color: $text-muted;
+    background: transparent;
+    text-style: none;
+}
+
+#mode-tabs Tab:hover {
+    color: $text;
+    background: $primary 15%;
+}
+
+#mode-tabs Tab.-active {
+    color: $accent;
+    background: $accent 15%;
+    text-style: none;
+}
+
+/* Keyboard focus (tab key): lift the active tab and the underline. The extra
+   `#mode-tabs:focus` specificity also beats Textual's block-cursor default. */
+#mode-tabs:focus Tab.-active {
+    color: $accent;
+    background: $accent 25%;
+    text-style: none;
+}
+
+#mode-tabs:focus Tab:hover {
+    color: $accent;
+}
+
+#mode-tabs .underline--bar {
+    color: $accent;
+    background: $foreground 12%;
+}
+
+#mode-tabs:focus .underline--bar {
+    color: $accent;
+    background: $accent 45%;
+}
+
+AutoComplete {
+    max-height: 10;
+    background: $panel;
+    border: tall $secondary 20%;
+
+    & AutoCompleteList {
+        background: transparent;
+        border: none;
+        padding: 0;
+
+        & > .option-list--option {
+            padding: 0 1;
+        }
+
+        & > .option-list--option-highlighted {
+            background: $secondary 20%;
+            color: $foreground;
+        }
+    }
+
+    & .autocomplete--highlight-match {
+        color: $accent;
+        text-style: bold;
+    }
+}
+
+/* Opaque, bordered selects — the default theme border/tint reads as
+   see-through against $surface dialogs. */
+SelectCurrent {
+    background: $panel;
+    border: tall $secondary 20%;
+}
+Select:focus > SelectCurrent {
+    background: $panel;
+    border: tall $secondary;
+    background-tint: transparent;
+}
+Select > SelectOverlay {
+    background: $panel;
+    border: tall $secondary 20%;
+}
+Select > SelectOverlay > OptionList {
+    background: transparent;
+    border: none;
+}
+
+/* ── Generic modal dialogs (settings, new watchlist) ── */
 #modal-body {
     width: 62;
     height: auto;
@@ -106,15 +201,6 @@ DataTable > .datatable--hover {
 }
 .error {
     color: $error;
-}
-#conditions {
-    height: auto;
-    max-height: 12;
-    border: solid $accent 30%;
-    margin: 1 0;
-}
-#conditions Horizontal {
-    height: auto;
 }
 #modal-actions {
     height: auto;
@@ -163,10 +249,25 @@ class AlertsApp(App[None]):
         self.install_screen(self.alerts_screen, "alerts")
         self.run_worker(self.monitor.run(), exclusive=True, group="price-monitor")
 
-    def _on_watchlist_change(self, name: str, symbols: list[str]) -> None:
-        """Persist a newly created watchlist to user settings."""
-        self.user.watchlist.watchlists[name] = list(symbols)
-        self.user.watchlist.active = name
+    def _on_watchlist_change(self, name: str, symbols: list[str] | None) -> None:
+        """Persist a created/updated watchlist; `symbols=None` deletes it."""
+        if symbols is None:
+            remaining = [n for n in self.user.watchlist.watchlists if n != name]
+            # Repoint active before removing the key: a dangling `active` makes
+            # `active_symbols()` raise KeyError and breaks the create-alert modal.
+            if self.user.watchlist.active == name:
+                self.user.watchlist.active = remaining[0] if remaining else "default"
+            self.user.watchlist.watchlists.pop(name, None)
+        else:
+            self.user.watchlist.watchlists[name] = list(symbols)
+            self.user.watchlist.active = name
+        if not self.user.watchlist.watchlists:
+            self.user.watchlist.watchlists["default"] = []
+        self.user.watchlist.active = (
+            self.user.watchlist.active
+            if self.user.watchlist.active in self.user.watchlist.watchlists
+            else next(iter(self.user.watchlist.watchlists))
+        )
         save_settings(self.user)
 
     def action_settings(self) -> None:
@@ -198,6 +299,19 @@ class AlertsApp(App[None]):
             await close()
 
 
+def _resolve_db_path() -> str:
+    """Absolute alerts.db path for the spawned server, independent of its cwd."""
+    explicit = os.environ.get("ALERTS_DB_PATH")
+    if explicit:
+        return explicit
+    try:
+        from app.config import settings
+
+        return settings.ALERTS_DB_PATH
+    except Exception:
+        return str(Path.cwd() / "alerts.db")
+
+
 def _server_alive(base_url: str) -> bool:
     try:
         resp = httpx.get(f"{base_url}/alerts", timeout=0.5)
@@ -209,6 +323,11 @@ def _server_alive(base_url: str) -> bool:
 def _spawn_api(base_url: str) -> subprocess.Popen | None:
     """Start the FastAPI server in the background if it isn't already running."""
     port = urlparse(base_url).port or 8333
+    # The bundled server may be a copy living elsewhere (e.g. site-packages), so
+    # it resolves its own ``PROJECT_ROOT`` and would open a different alerts.db.
+    # Pin the database path explicitly to the one this install is configured for.
+    env = dict(os.environ)
+    env.setdefault("ALERTS_DB_PATH", _resolve_db_path())
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -223,6 +342,7 @@ def _spawn_api(base_url: str) -> subprocess.Popen | None:
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=env,
     )
     for _ in range(20):  # ~5s to boot
         if _server_alive(base_url):

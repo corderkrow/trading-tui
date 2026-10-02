@@ -332,9 +332,11 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         default_symbol: str = "BTCUSD",
         symbols: list[str] | None = None,
         api: AlertApiClient | None = None,
+        initial: AlertSpec | None = None,
     ) -> None:
         super().__init__()
-        self.default_symbol = default_symbol.upper()
+        self._initial = initial
+        self.default_symbol = (initial.symbol if initial else default_symbol).upper()
         options = [self.default_symbol, *(symbols or [])]
         self.symbols = list(dict.fromkeys(options))
         self._api = api
@@ -342,10 +344,20 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         self._symbol_timer = None
         self._inline_id = uuid4().hex[:8]
         self._inline_timeframe = DEFAULT_TIMEFRAME
-        self._message = ""
-        self._message_dirty = False
-        self._notifications = list(DEFAULT_NOTIFICATIONS)
-        self._expires_at = datetime.now().astimezone() + timedelta(days=30)
+        self._message = initial.message if initial else ""
+        self._message_dirty = initial is not None
+        self._notifications = (
+            list(initial.notifications) if initial else list(DEFAULT_NOTIFICATIONS)
+        )
+        self._expires_at = (
+            initial.expires_at
+            if initial
+            else datetime.now().astimezone() + timedelta(days=30)
+        )
+
+    @property
+    def editing(self) -> bool:
+        return self._initial is not None
 
     def compose(self) -> ComposeResult:
         symbol_input = Input(
@@ -353,7 +365,9 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         )
         with Vertical(id="dialog"):
             with Horizontal(id="header"):
-                yield Label("Create alert on", id="title")
+                yield Label(
+                    "Edit alert on" if self.editing else "Create alert on", id="title"
+                )
                 yield symbol_input
                 yield Static(classes="spacer")
                 yield Button("⊞", id="templates", classes="icon")
@@ -410,7 +424,9 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
                     yield Button("", id="notifications", classes="row-link")
             with Horizontal(id="footer"):
                 yield Button("Cancel", id="cancel")
-                yield Button("Create", id="create", variant="primary")
+                yield Button(
+                    "Save" if self.editing else "Create", id="create", variant="primary"
+                )
         self._symbol_autocomplete = SymbolAutoComplete(
             symbol_input,
             id="symbol-autocomplete",
@@ -423,11 +439,24 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
             self._symbol_autocomplete.set_hits(
                 [SearchHitView(symbol=s, name="") for s in self.symbols]
             )
+        if self._initial is not None:
+            self._hydrate_initial(self._initial)
         self._sync_notifications()
         self._render_mode()
         self._sync_timeframe_hint()
         self._sync_message()
         self.query_one("#value", PriceInput).focus()
+
+    def _hydrate_initial(self, spec: AlertSpec) -> None:
+        self.query_one("#symbol", Input).value = spec.symbol
+        self.query_one("#trigger", Select).value = (
+            spec.trigger if spec.trigger in TRIGGERS else "Once only"
+        )
+        conditions = list(spec.conditions)
+        if len(conditions) >= 2:
+            self._condition_list().conditions = conditions
+        elif conditions:
+            self._hydrate_inline(conditions[0])
 
     # ── condition mode ──────────────────────────────────────
 

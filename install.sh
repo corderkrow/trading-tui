@@ -17,13 +17,13 @@ VENV_DIR="$PREFIX_DIR/venv"
 
 # coderkrow brand palette — dark variant (truecolor)
 # tokens per .ai/rules/brand/RULES.md §2, matching tui_client/themes.py
-TEAL_LIGHT='\033[38;2;59;184;186m'  # #3bb8ba — accents, highlights, success
-TEAL_MID='\033[38;2;46;127;128m'    # #2e7f80 — interactive chrome, borders
-CYAN='\033[38;2;0;209;212m'         # #00d1d4 — signal only: active/on, focus
-DANGER='\033[38;2;200;60;60m'       # #c83c3c — errors, down deltas
-MUTED='\033[38;2;136;135;128m'      # #888780 — secondary text, captions
-FG='\033[38;2;232;230;223m'         # #e8e6df — ink, primary text
-BG='\033[48;2;17;17;16m'            # #111110 — bg, near-black (never #000)
+TEAL_LIGHT='\033[38;2;87;188;187m'  # #57bcbb — accents, highlights, success
+TEAL_MID='\033[38;2;63;154;153m'    # #3f9a99 — interactive chrome, borders
+CYAN='\033[38;2;95;201;199m'        # #5fc9c7 — signal only: active/on, focus
+DANGER='\033[38;2;224;145;138m'     # #e0918a — errors, down deltas
+MUTED='\033[38;2;139;138;131m'      # #8b8a83 — secondary text, captions
+FG='\033[38;2;216;214;207m'         # #d8d6cf — ink, primary text
+BG='\033[48;2;25;26;24m'            # #191a18 — bg, lifted graphite (never #000)
 DIM='\033[2m'; RESET='\033[0m'
 if [ ! -t 1 ]; then
   TEAL_LIGHT=''; TEAL_MID=''; CYAN=''; DANGER=''; MUTED=''; FG=''; BG=''; DIM=''; RESET=''

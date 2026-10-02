@@ -1,0 +1,219 @@
+/* Create-alert modal — TradingView-style dialog.
+   Colors come from the active Textual theme (default: coderkrow dark,
+   tui_client/themes.py). No raw hex here — brand rule: tokens only. */
+
+CreateAlertModal {
+    align: center middle;
+    background: $background 60%;
+}
+
+CreateAlertModal #dialog {
+    width: 64;
+    height: auto;
+    max-height: 90%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 0 2;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+CreateAlertModal #header {
+    height: 3;
+    align-vertical: middle;
+}
+CreateAlertModal #title {
+    width: auto;
+    text-style: bold;
+    padding-right: 1;
+}
+CreateAlertModal #symbol {
+    width: 18;
+}
+CreateAlertModal .spacer {
+    width: 1fr;
+}
+CreateAlertModal .icon {
+    min-width: 3;
+    width: 3;
+    border: none;
+    background: transparent;
+    color: $text-muted;
+}
+CreateAlertModal .icon:hover {
+    color: $foreground;
+    background: transparent;
+}
+
+/* ── Body ───────────────────────────────────────────── */
+CreateAlertModal #body {
+    height: auto;
+    max-height: 60vh;
+}
+CreateAlertModal .section {
+    grid-size: 2;
+    grid-columns: 14 1fr;
+    border-top: solid $panel;
+    padding: 1 0;
+    height: auto;
+}
+CreateAlertModal .label {
+    width: 14;
+    height: 3;
+    color: $text-muted;
+    content-align: left middle;
+}
+CreateAlertModal Select,
+CreateAlertModal Input {
+    width: 1fr;
+}
+CreateAlertModal #value_type {
+    width: 16;
+}
+
+CreateAlertModal #condition-controls,
+CreateAlertModal #condition-rows,
+CreateAlertModal .condition-row,
+CreateAlertModal .value-row,
+CreateAlertModal .add-row {
+    height: auto;
+}
+CreateAlertModal .link {
+    color: $secondary;
+    background: transparent;
+    border: none;
+    min-width: 0;
+    width: auto;
+    height: 3;
+}
+CreateAlertModal .link:hover {
+    color: $accent;
+    background: transparent;
+}
+CreateAlertModal .help {
+    width: 3;
+    height: 3;
+    color: $text-muted;
+    content-align: center middle;
+}
+
+CreateAlertModal .row-link {
+    background: transparent;
+    border: none;
+    text-align: left;
+    width: 1fr;
+    height: 3;
+    color: $foreground;
+}
+CreateAlertModal .row-link:hover {
+    color: $secondary;
+    background: transparent;
+}
+
+/* ── Footer ─────────────────────────────────────────── */
+CreateAlertModal #footer {
+    height: 5;
+    border-top: solid $panel;
+    align-horizontal: right;
+    padding-top: 1;
+}
+CreateAlertModal #footer Button {
+    margin-left: 2;
+}
+CreateAlertModal #cancel {
+    background: transparent;
+    border: solid $secondary;
+    color: $secondary;
+}
+CreateAlertModal #cancel:hover {
+    background: $secondary 20%;
+}
+
+/* ── Message sub-screen ─────────────────────────────── */
+MessageScreen {
+    align: center middle;
+    background: $background 60%;
+}
+MessageScreen #message-dialog {
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+MessageScreen #message-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+MessageScreen #message-text {
+    height: 10;
+    border: solid $panel;
+}
+MessageScreen #message-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+MessageScreen #message-actions Button {
+    margin-left: 2;
+}
+
+/* ── Notifications sub-screen ───────────────────────── */
+NotificationsScreen {
+    align: center middle;
+    background: $background 60%;
+}
+NotificationsScreen #notifications-dialog {
+    width: 48;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+NotificationsScreen #notifications-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+NotificationsScreen #notifications-list {
+    height: auto;
+    max-height: 12;
+}
+NotificationsScreen #notifications-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+NotificationsScreen #notifications-actions Button {
+    margin-left: 2;
+}
+
+/* ── Expiration sub-screen ──────────────────────────── */
+ExpirationScreen {
+    align: center middle;
+    background: $background 60%;
+}
+ExpirationScreen #expiration-dialog {
+    width: 48;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 60%;
+    padding: 1 2;
+}
+ExpirationScreen #expiration-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+ExpirationScreen #expiration-list {
+    height: auto;
+    max-height: 12;
+}
+ExpirationScreen #expiration-actions {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+ExpirationScreen #expiration-actions Button {
+    margin-left: 2;
+}

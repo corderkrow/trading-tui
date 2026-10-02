@@ -6,11 +6,13 @@ Telegram etc. means registering a new class here — AlertService is untouched.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.services.alerts.domain import Alert, AlertEvent
+
+MAX_IN_APP_EVENTS = 1000
 
 
 class NotificationChannel(Protocol):
@@ -19,15 +21,28 @@ class NotificationChannel(Protocol):
     async def notify(self, alert: Alert, event: AlertEvent) -> None: ...
 
 
-@dataclass
 class InAppChannel:
-    """Records events into an in-memory notification log (visible in TUI)."""
+    """Records events into a bounded in-memory ring buffer (visible in TUI/API).
 
-    name: str = "in_app"
-    events: list[AlertEvent] = field(default_factory=list)
+    Oldest events fall off the end once `maxlen` is reached; `recent()` reads
+    them back newest-first.
+    """
+
+    def __init__(self, name: str = "in_app", maxlen: int = MAX_IN_APP_EVENTS) -> None:
+        self.name = name
+        self._events: deque[AlertEvent] = deque(maxlen=maxlen)
+
+    @property
+    def events(self) -> list[AlertEvent]:
+        return list(self._events)
+
+    def recent(self, limit: int = 50) -> list[AlertEvent]:
+        """Last `limit` events, newest first."""
+        items = list(self._events)
+        return items[-limit:][::-1]
 
     async def notify(self, alert: Alert, event: AlertEvent) -> None:
-        self.events.append(event)
+        self._events.append(event)
 
 
 class NoopChannel:
@@ -67,7 +82,17 @@ class NotificationService:
             channel = self.channels.get(name)
             if channel is None:
                 continue
-            await channel.notify(alert, event)
+            try:
+                await channel.notify(alert, event)
+            except Exception:
+                # One broken channel must not stop the others (or the caller).
+                # MVP channels are local; log to stderr for diagnosis.
+                import sys
+
+                print(
+                    f"notification channel '{name}' failed: {sys.exc_info()[1]}",
+                    file=sys.stderr,
+                )
 
 
 def default_channels() -> dict[str, NotificationChannel]:
@@ -78,4 +103,5 @@ def default_channels() -> dict[str, NotificationChannel]:
         "sound": NoopChannel("sound"),
         "push": NoopChannel("push"),
         "email": NoopChannel("email"),
+        "webhook": NoopChannel("webhook"),
     }

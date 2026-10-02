@@ -2,21 +2,39 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 from rich.text import Text
-from textual.widgets import Button, Checkbox, DataTable, Input, Label, Static, Tabs
+from textual.widgets import Button, DataTable, Input, Select, SelectionList, Static, Tabs
 
 from tui_client.api import AlertView, ApiError, CandleView, QuoteView
+from tui_client.alerts.screens import AlertScreen
 from tui_client.app import AlertsApp
 from tui_client.screens.alert_list import AlertListScreen
-from tui_client.screens.create_alert import CreateAlertModal
-from tui_client.screens.prices import DEFAULT_WATCHLIST, PricesScreen
+from tui_client.screens.create_alert import (
+    CreateAlertModal,
+    ExpirationScreen,
+    MessageScreen,
+    NotificationsScreen,
+)
+from tui_client.screens.prices import (
+    DEFAULT_WATCHLIST,
+    AddSymbolModal,
+    ConfirmModal,
+    NameModal,
+    PricesScreen,
+)
+from tui_client.screens.symbol_info import SymbolInfoScreen
+from tui_client.themes import DANGER, SUCCESS
+from tui_client.widgets import SymbolAutoComplete
 
 
 class FakeApi:
     def __init__(self, alerts: list[AlertView] | None = None) -> None:
         self.alerts = list(alerts or [])
         self.created: list[dict] = []
+        self.updated: list[tuple[str, dict]] = []
         self.deleted: list[str] = []
         self.enabled: list[str] = []
         self.disabled: list[str] = []
@@ -44,6 +62,18 @@ class FakeApi:
     async def delete_alert(self, alert_id: str) -> None:
         self.deleted.append(alert_id)
         self.alerts = [a for a in self.alerts if a.id != alert_id]
+
+    async def update_alert(self, alert_id: str, payload: dict) -> AlertView:
+        self.updated.append((alert_id, payload))
+        alert = AlertView(
+            id=alert_id,
+            symbol=payload["symbol"],
+            status="ACTIVE",
+            conditions=payload["conditions"],
+            message=payload.get("message", ""),
+        )
+        self.alerts = [alert if a.id == alert_id else a for a in self.alerts]
+        return alert
 
     async def enable_alert(self, alert_id: str) -> AlertView:
         self.enabled.append(alert_id)
@@ -128,10 +158,6 @@ def modal_open(app) -> bool:
     return isinstance(app.screen, CreateAlertModal)
 
 
-def error_text(modal: CreateAlertModal) -> str:
-    return str(modal.query_one("#error", Label).render())
-
-
 def open_modal(pilot) -> CreateAlertModal:
     return pilot.app.screen  # modal is the top screen
 
@@ -165,8 +191,8 @@ async def test_list_displays_alerts(pilot_app):
     assert await wait_until(pilot, lambda: table_rows(app) == 2)
     table = app.screen.query_one("#alerts-table", DataTable)
     assert plain(table.get_row_at(0)[0]) == "ETHUSDT"
-    assert "Crossing" in table.get_row_at(0)
-    assert plain(table.get_row_at(1)[3]) == "ACTIVE"
+    assert plain(table.get_row_at(0)[1]) == "Crossing"
+    assert plain(table.get_row_at(1)[4]) == "ACTIVE"
 
 
 async def test_list_shows_empty_hint_when_no_alerts():
@@ -189,29 +215,131 @@ async def test_open_modal_and_cancel_with_escape(pilot_app):
     assert await wait_until(pilot, lambda: not modal_open(app))
 
 
+async def test_sub_screens_update_modal(pilot_app):
+    app, pilot, api = pilot_app
+    await pilot.press("n")
+    assert await wait_until(pilot, lambda: modal_open(app))
+    modal = open_modal(pilot)
+
+    # Message sub-screen
+    modal.query_one("#message", Button).press()
+    assert await wait_until(pilot, lambda: isinstance(app.screen, MessageScreen))
+    app.screen.query_one("#message-text").text = "{{ticker}} broke out"
+    app.screen.query_one("#message-ok", Button).press()
+    assert await wait_until(pilot, lambda: modal_open(app))
+    assert modal.query_one("#message", Button).label.plain == "{{ticker}} broke out >"
+
+    # Notifications sub-screen
+    modal.query_one("#notifications", Button).press()
+    assert await wait_until(pilot, lambda: isinstance(app.screen, NotificationsScreen))
+    sel = app.screen.query_one("#notifications-list", SelectionList)
+    sel.select("Email")
+    sel.deselect("Sound")
+    app.screen.query_one("#notifications-ok", Button).press()
+    assert await wait_until(pilot, lambda: modal_open(app))
+    assert modal.query_one("#notifications", Button).label.plain == "App, Toasts, Email >"
+
+    # Expiration sub-screen
+    modal.query_one("#expiration", Button).press()
+    assert await wait_until(pilot, lambda: isinstance(app.screen, ExpirationScreen))
+    app.screen.query_one("#expiration-ok", Button).press()
+    assert await wait_until(pilot, lambda: modal_open(app))
+
+    # payload reflects the edited message + notifications
+    modal.query_one("#value", Input).value = "100"
+    await pilot.pause()
+    modal.query_one("#create", Button).press()
+    assert await wait_until(pilot, lambda: len(api.created) == 1)
+    assert api.created[0]["message"] == "{{ticker}} broke out"
+    assert api.created[0]["notification_channels"] == ["in_app", "toast", "email"]
+
+
 async def test_create_alert_full_flow(pilot_app):
     app, pilot, api = pilot_app
     await pilot.press("n")
     assert await wait_until(pilot, lambda: modal_open(app))
     modal = open_modal(pilot)
 
-    modal.query_one("#symbol", Input).value = "ETHUSDT"
-    modal.query_one("#val-0", Input).value = "4000"
-    modal.query_one("#expiry", Input).value = "2099-01-01T00:00:00Z"
-    modal.query_one("#message", Input).value = "To the moon"
-    modal.query_one("#ch-toast", Checkbox).value = True
+    modal.query_one("#symbol", Input).value = "ETH-USD"
+    modal.query_one("#value", Input).value = "4000"
+    await pilot.pause()
+    assert modal.query_one("#message", Button).label.plain == "ETH-USD Crossing 4000 >"
 
     modal.query_one("#create", Button).press()
     assert await wait_until(pilot, lambda: len(api.created) == 1)
     assert await wait_until(pilot, lambda: not modal_open(app))
 
     payload = api.created[0]
-    assert payload["symbol"] == "ETHUSDT"
+    assert payload["symbol"] == "ETH-USD"
     assert payload["conditions"] == [{"metric": "price", "operator": "crossing", "value": 4000.0}]
     assert payload["trigger_mode"] == "ONCE"
-    assert payload["notification_channels"] == ["in_app", "toast"]
-    assert payload["message"] == "To the moon"
+    assert payload["notification_channels"] == ["in_app", "toast", "sound"]
+    assert payload["message"] == "ETH-USD Crossing 4000"
     assert await wait_until(pilot, lambda: table_rows(app) == 3)  # 2 original + 1 new
+
+
+async def test_create_alert_symbol_autocomplete(pilot_app):
+    app, pilot, _ = pilot_app
+    await pilot.press("n")
+    assert await wait_until(pilot, lambda: modal_open(app))
+    modal = open_modal(pilot)
+    symbol = modal.query_one("#symbol", Input)
+    symbol.focus()
+    symbol.value = ""
+    await pilot.pause()
+    autocomplete = modal.query_one(SymbolAutoComplete)
+    # Watchlist symbols seed the list, so focusing shows suggestions before typing.
+    assert await wait_until(
+        pilot,
+        lambda: autocomplete.display and autocomplete.option_list.option_count > 0,
+    )
+    await pilot.press("e", "t", "h")
+    assert await wait_until(
+        pilot,
+        lambda: autocomplete.display and autocomplete.option_list.option_count > 0,
+    )
+    await pilot.press("enter")
+    assert await wait_until(pilot, lambda: symbol.value == "ETH-USD")
+    assert await wait_until(pilot, lambda: not autocomplete.display)
+    assert modal.query_one("#message", Button).label.plain == "ETH-USD Crossing 0.00 >"
+
+
+async def test_create_alert_symbol_search_error_keeps_modal(pilot_app):
+    app, pilot, api = pilot_app
+
+    async def boom(query: str, limit: int = 10):
+        raise RuntimeError("search endpoint exploded")
+
+    api.search_symbols = boom
+    await pilot.press("n")
+    assert await wait_until(pilot, lambda: modal_open(app))
+    modal = open_modal(pilot)
+    symbol = modal.query_one("#symbol", Input)
+    symbol.focus()
+    symbol.value = ""
+    await pilot.pause()
+    await pilot.press("e", "t", "h")
+    await pilot.pause()
+    assert modal_open(app)
+    assert symbol.value == "eth"
+
+
+async def test_message_auto_updates_until_edited(pilot_app):
+    app, pilot, _ = pilot_app
+    await pilot.press("n")
+    assert await wait_until(pilot, lambda: modal_open(app))
+    modal = open_modal(pilot)
+
+    modal.query_one("#operator", Select).value = "Greater than"
+    modal.query_one("#value", Input).value = "100"
+    await pilot.pause()
+    assert modal.query_one("#message", Button).label.plain == "BTCUSDT Greater than 100 >"
+
+    # user edit wins — later changes no longer regenerate the message
+    modal._handle_message("custom {{ticker}} text")
+    modal.query_one("#value", Input).value = "200"
+    await pilot.pause()
+    assert modal.query_one("#message", Button).label.plain == "custom {{ticker}} text >"
 
 
 async def test_add_second_condition(pilot_app):
@@ -220,69 +348,72 @@ async def test_add_second_condition(pilot_app):
     assert await wait_until(pilot, lambda: modal_open(app))
     modal = open_modal(pilot)
 
-    modal.query_one("#add-condition", Button).press()
-    assert await wait_until(pilot, lambda: modal.query("#val-1"))
+    await pilot.press("ctrl+n")
+    assert await wait_until(pilot, lambda: bool(modal.query("#value-1")))
 
-    modal.query_one("#symbol", Input).value = "BTCUSDT"
-    modal.query_one("#val-0", Input).value = "100000"
-    modal.query_one("#val-1", Input).value = "90000"
-    modal.query_one("#expiry", Input).value = "2099-01-01T00:00:00Z"
+    modal.query_one("#value", Input).value = "100000"
+    modal.query_one("#value-1", Input).value = "90000"
     modal.query_one("#create", Button).press()
 
     assert await wait_until(pilot, lambda: len(api.created) == 1)
     assert len(api.created[0]["conditions"]) == 2
 
 
-async def test_validation_errors_displayed(pilot_app):
+async def test_validation_errors_keep_modal_open(pilot_app):
     app, pilot, api = pilot_app
     await pilot.press("n")
     assert await wait_until(pilot, lambda: modal_open(app))
     modal = open_modal(pilot)
 
-    modal.query_one("#symbol", Input).value = "ETHUSDT"
     # empty value -> number parse error
+    modal.query_one("#value", Input).value = ""
+    await pilot.pause()
     modal.query_one("#create", Button).press()
-    assert await wait_until(pilot, lambda: "must be a number" in error_text(modal))
+    await pilot.pause()
     assert api.created == []
+    assert modal_open(app)
 
     # non-positive value
-    modal.query_one("#val-0", Input).value = "0"
+    modal.query_one("#value", Input).value = "0"
+    await pilot.pause()
     modal.query_one("#create", Button).press()
-    assert await wait_until(
-        pilot, lambda: "greater than 0" in error_text(modal)
-    )
+    await pilot.pause()
+    assert api.created == []
+    assert modal_open(app)
 
     # no notification channels
-    modal.query_one("#val-0", Input).value = "100"
-    modal.query_one("#ch-in_app", Checkbox).value = False
+    modal.query_one("#value", Input).value = "100"
+    await pilot.pause()
+    modal.query_one("#notifications", Button).press()
+    assert await wait_until(pilot, lambda: isinstance(app.screen, NotificationsScreen))
+    app.screen.query_one("#notifications-list", SelectionList).deselect_all()
+    app.screen.query_one("#notifications-ok", Button).press()
+    assert await wait_until(pilot, lambda: modal_open(app))
     modal.query_one("#create", Button).press()
-    assert await wait_until(
-        pilot, lambda: "notification channel" in error_text(modal)
-    )
-    modal.query_one("#ch-in_app", Checkbox).value = True
+    await pilot.pause()
+    assert api.created == []
+    assert modal_open(app)
 
     # past expiration
-    modal.query_one("#expiry", Input).value = "2020-01-01T00:00:00Z"
+    modal._notifications = ["App"]
+    modal._expires_at = datetime.now().astimezone() - timedelta(days=1)
     modal.query_one("#create", Button).press()
-    assert await wait_until(
-        pilot, lambda: "Expiration must be in the future" in error_text(modal)
-    )
+    await pilot.pause()
     assert api.created == []
+    assert modal_open(app)
 
 
-async def test_api_error_surfaces_in_modal(pilot_app):
+async def test_api_error_surfaces(pilot_app):
     app, pilot, api = pilot_app
     api.fail_create = "Unknown notification channel(s): slack"
     await pilot.press("n")
     assert await wait_until(pilot, lambda: modal_open(app))
     modal = open_modal(pilot)
-    modal.query_one("#val-0", Input).value = "100"
-    modal.query_one("#expiry", Input).value = "2099-01-01T00:00:00Z"
+    modal.query_one("#value", Input).value = "100"
     modal.query_one("#create", Button).press()
-    assert await wait_until(
-        pilot, lambda: "slack" in error_text(modal)
-    )
-    assert modal_open(app)  # modal stays open
+    assert await wait_until(pilot, lambda: not modal_open(app))
+    assert api.created == []
+    assert table_rows(app) == 2  # list unchanged
 
 
 async def test_enable_disable_delete_actions(pilot_app):
@@ -325,9 +456,9 @@ async def test_prices_watchlist_shows_colored_change(prices_app):
     # cells carry color markup: red for negative, green for positive
     rows = [prices.get_row_at(i) for i in range(prices.row_count)]
     nvda_cell = next(r[3] for r in rows if plain(r[0]) == "NVDA")
-    assert nvda_cell == "[red]-2.50%[/]"
+    assert nvda_cell == f"[{DANGER}]▼ -2.50%[/]"
     eth_cell = next(r[3] for r in rows if plain(r[0]) == "ETH-USD")
-    assert eth_cell == "[green]+1.50%[/]"
+    assert eth_cell == f"[{SUCCESS}]▲ +1.50%[/]"
 
 
 async def test_screener_modes_toggle(prices_app):
@@ -461,6 +592,24 @@ async def test_tab_cycles_top_level_tabs_and_alerts(prices_app):
     assert "Top" in str(label.render())
 
 
+async def test_alerts_tab_stays_active_after_markets_tab(prices_app):
+    app, pilot, _ = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+
+    await pilot.press("a")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
+
+    # Activating a markets tab while Alerts is mounted navigates to Prices...
+    app.screen.query_one("#mode-tabs", Tabs).active = "t"
+    assert await wait_until(pilot, lambda: isinstance(app.screen, PricesScreen))
+
+    # ...and returning to Alerts must re-arm the Alerts tab, not the stale one.
+    await pilot.press("a")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
+    assert app.screen.query_one("#mode-tabs", Tabs).active == "a"
+
+
 async def test_ctrl_right_cycles_watchlists():
     from tui_client.settings import UserSettings
 
@@ -473,6 +622,203 @@ async def test_ctrl_right_cycles_watchlists():
         assert await wait_until(pilot, lambda: app.screen.active_watchlist == "default")
         await pilot.press("ctrl+right")
         assert await wait_until(pilot, lambda: app.screen.active_watchlist == "crypto")
+
+
+async def test_watchlist_add_symbol(monkeypatch):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD", "ETH-USD"], "crypto": ["SOL-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        prices = screen.query_one("#prices-table", DataTable)
+        assert await wait_until(pilot, lambda: len(prices.rows) == 2)
+
+        await pilot.press("plus")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AddSymbolModal))
+        app.screen.query_one("#wl-symbol", Input).value = "msft"
+        app.screen.query_one("#wl-target", Select).value = "crypto"
+        await pilot.pause()
+        app.screen.query_one("#add", Button).press()
+
+        assert await wait_until(pilot, lambda: "MSFT" in user.watchlist.watchlists["crypto"])
+        assert user.watchlist.watchlists["crypto"] == ["SOL-USD", "MSFT"]
+        assert user.watchlist.watchlists["default"] == ["BTC-USD", "ETH-USD"]
+
+
+async def test_watchlist_add_uses_active_by_default(monkeypatch):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD", "ETH-USD"], "crypto": ["SOL-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        prices = screen.query_one("#prices-table", DataTable)
+        assert await wait_until(pilot, lambda: len(prices.rows) == 2)
+
+        await pilot.press("plus")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AddSymbolModal))
+        app.screen.query_one("#wl-symbol", Input).value = "msft"
+        await pilot.pause()
+        app.screen.query_one("#add", Button).press()
+
+        assert await wait_until(pilot, lambda: "MSFT" in screen.watchlist)
+        assert user.watchlist.watchlists["default"] == ["BTC-USD", "ETH-USD", "MSFT"]
+        assert await wait_until(pilot, lambda: len(prices.rows) == 3)
+
+
+async def test_watchlist_new_and_delete(monkeypatch):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "default")
+
+        # create
+        await pilot.press("n")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, NameModal))
+        app.screen.query_one("#wl-name", Input).value = "crypto"
+        app.screen.query_one("#create", Button).press()
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "crypto")
+        assert "crypto" in user.watchlist.watchlists
+
+        # delete
+        await pilot.press("D")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, ConfirmModal))
+        app.screen.query_one("#confirm", Button).press()
+        assert await wait_until(pilot, lambda: "crypto" not in screen.watchlists)
+        assert "crypto" not in user.watchlist.watchlists
+        assert screen.active_watchlist == "default"
+
+
+async def test_alert_creation_after_deleting_active_watchlist(monkeypatch):
+    """Deleting the active list must not break alert creation (dangling active)."""
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD"], "crypto": ["ETH-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        await pilot.press("ctrl+right")
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "crypto")
+
+        await pilot.press("D")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, ConfirmModal))
+        app.screen.query_one("#confirm", Button).press()
+        assert await wait_until(pilot, lambda: "crypto" not in user.watchlist.watchlists)
+
+        # the active pointer must still resolve
+        assert user.watchlist.active_symbols() == ["BTC-USD"]
+
+        # and the create-alert modal must open and build a payload
+        await pilot.press("a")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
+        await pilot.press("n")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, CreateAlertModal))
+        app.screen.query_one("#symbol", Input).value = "BTCUSDT"
+        app.screen.query_one("#value", Input).value = "50000"
+        await pilot.pause()
+        app.screen.action_create()
+        await pilot.pause()
+        assert await wait_until(pilot, lambda: bool(app.api.created))
+
+
+async def test_watchlist_rename(monkeypatch):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD"], "crypto": ["ETH-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "default")
+
+        await pilot.press("ctrl+right")
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "crypto")
+
+        await pilot.press("e")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, NameModal))
+        app.screen.query_one("#wl-name", Input).value = "alts"
+        app.screen.query_one("#create", Button).press()
+
+        assert await wait_until(pilot, lambda: screen.active_watchlist == "alts")
+        assert "alts" in user.watchlist.watchlists
+        assert "crypto" not in user.watchlist.watchlists
+        assert user.watchlist.watchlists["alts"] == ["ETH-USD"]
+
+
+async def test_watchlist_remove_from_other_list(monkeypatch):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.mode = "multiple"
+    user.watchlist.watchlists = {"default": ["BTC-USD"], "crypto": ["ETH-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        screen = app.screen
+        prices = screen.query_one("#prices-table", DataTable)
+        assert await wait_until(pilot, lambda: len(prices.rows) == 1)
+
+        # search shows a symbol that lives on another list
+        api = app.api
+        api._universe = ["ETH-USD"]
+        search = screen.query_one("#search", Input)
+        search.value = "ETH-USD"
+        assert await wait_until(pilot, lambda: any(q.symbol == "ETH-USD" for q in screen._quotes))
+        prices.move_cursor(row=0)
+        await pilot.pause()
+        await pilot.press("x")
+
+        assert await wait_until(pilot, lambda: "ETH-USD" not in screen.watchlists["crypto"])
+        assert user.watchlist.watchlists["crypto"] == []
+
+
+@pytest.mark.parametrize(
+    "remove_key",
+    ["x", "delete", "backspace", "ctrl+h", "minus", "shift+delete", "ctrl+delete"],
+)
+async def test_watchlist_remove_symbol(monkeypatch, remove_key):
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.app.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.watchlists = {"default": ["BTC-USD", "ETH-USD"]}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("w")
+        prices = app.screen.query_one("#prices-table", DataTable)
+        assert await wait_until(pilot, lambda: len(prices.rows) == 2)
+
+        prices.move_cursor(row=0)
+        await pilot.pause()
+        await pilot.press(remove_key)
+
+        assert await wait_until(pilot, lambda: "BTC-USD" not in app.screen.watchlist)
+        assert user.watchlist.watchlists["default"] == ["ETH-USD"]
+        assert await wait_until(pilot, lambda: len(prices.rows) == 1)
 
 
 async def test_candles_refetch_when_cache_stale(prices_app):
@@ -516,3 +862,92 @@ async def test_candles_reused_when_cache_fresh(prices_app):
     await screen.reload()
 
     assert calls == [], "fresh candle cache should not hit the API"
+
+
+async def test_symbol_info_create_alert_flow(prices_app):
+    app, pilot, api = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+    quote = app.screen._quotes[0]
+
+    app.push_screen(SymbolInfoScreen(app.api, quote))
+    assert await wait_until(pilot, lambda: isinstance(app.screen, SymbolInfoScreen))
+    assert await wait_until(pilot, lambda: bool(app.screen.query("#create-alert")))
+
+    app.screen.query_one("#create-alert", Button).press()
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+    assert await wait_until(pilot, lambda: bool(app.screen.query("#symbol")))
+    assert app.screen.query_one("#symbol", Input).value == quote.symbol.upper()
+
+    app.screen.query_one("#value", Input).value = "100"
+    await pilot.pause()
+    await pilot.press("ctrl+s")
+
+    assert await wait_until(pilot, lambda: len(api.created) == 1)
+    assert api.created[0]["symbol"] == quote.symbol.upper()
+    assert api.created[0]["conditions"][0]["value"] == 100.0
+
+
+async def test_symbol_info_lists_edits_and_deletes_alerts():
+    api = FakeApi([sample_alert("BTC-USD")])
+    app = AlertsApp(api=api, default_symbol="BTC-USD")
+    async with app.run_test() as pilot:
+        assert await wait_until(pilot, lambda: isinstance(app.screen, PricesScreen))
+        quote = QuoteView(symbol="BTC-USD", price=100.0, change_24h=1.0)
+        app.push_screen(SymbolInfoScreen(app.api, quote))
+        assert await wait_until(pilot, lambda: isinstance(app.screen, SymbolInfoScreen))
+        assert await wait_until(pilot, lambda: bool(app.screen.query("#symbol-alerts")))
+
+        table = app.screen.query_one("#symbol-alerts", DataTable)
+        assert await wait_until(pilot, lambda: len(table.rows) == 1)
+        table.move_cursor(row=0)
+        await pilot.pause()
+
+        # edit → dialog prefilled → save issues a PUT
+        app.screen.query_one("#edit-alert", Button).press()
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+        assert await wait_until(pilot, lambda: bool(app.screen.query("#symbol")))
+        assert app.screen.query_one("#symbol", Input).value == "BTC-USD"
+        assert app.screen.query_one("#value", Input).value == "3,794.94"
+        app.screen.query_one("#value", Input).value = "250"
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+
+        assert await wait_until(pilot, lambda: bool(api.updated))
+        alert_id, payload = api.updated[0]
+        assert alert_id == "id-BTC-USD"
+        assert payload["conditions"][0]["value"] == 250.0
+        assert await wait_until(pilot, lambda: isinstance(app.screen, SymbolInfoScreen))
+
+        # delete → DELETE issued, table empties
+        assert await wait_until(pilot, lambda: len(table.rows) == 1)
+        table.move_cursor(row=0)
+        await pilot.pause()
+        app.screen.query_one("#delete-alert", Button).press()
+        assert await wait_until(pilot, lambda: "id-BTC-USD" in api.deleted)
+        assert await wait_until(pilot, lambda: len(table.rows) == 0)
+
+
+async def test_alert_list_row_selected_opens_editor_and_updates(pilot_app):
+    app, pilot, api = pilot_app
+    assert await wait_until(pilot, lambda: table_rows(app) == 2)
+    table = app.screen.query_one("#alerts-table", DataTable)
+    table.move_cursor(row=0)  # ETHUSDT
+    await pilot.pause()
+
+    # Enter / double-click both post DataTable.RowSelected → prefilled editor.
+    await pilot.press("enter")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+    assert await wait_until(pilot, lambda: bool(app.screen.query("#symbol")))
+    assert app.screen.query_one("#symbol", Input).value == "ETHUSDT"
+    assert app.screen.query_one("#value", Input).value == "3,794.94"
+
+    app.screen.query_one("#value", Input).value = "250"
+    await pilot.pause()
+    await pilot.press("ctrl+s")
+
+    assert await wait_until(pilot, lambda: bool(api.updated))
+    alert_id, payload = api.updated[0]
+    assert alert_id == "id-ETHUSDT"
+    assert payload["conditions"][0]["value"] == 250.0
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
