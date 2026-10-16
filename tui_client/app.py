@@ -184,6 +184,10 @@ Select > SelectOverlay > OptionList {
 }
 
 /* ── Generic modal dialogs (settings, new watchlist) ── */
+/* Textual 8 dropped the centered default; every modal needs its own. */
+ModalScreen {
+    align: center middle;
+}
 #modal-body {
     width: 62;
     height: auto;
@@ -208,6 +212,19 @@ Select > SelectOverlay > OptionList {
 }
 #modal-actions Button {
     margin-right: 1;
+}
+
+/* ── Toggle widgets (radio + checkbox) ──────────────── */
+/* Textual tints the off-state glyph with the darkened panel, which is black
+   on this dark panel — invisible. Muted for off, brand cyan for on. */
+RadioButton > .toggle--button,
+Checkbox > .toggle--button {
+    color: $text-muted;
+}
+
+RadioButton.-on > .toggle--button,
+Checkbox.-on > .toggle--button {
+    color: $accent;
 }
 """
 

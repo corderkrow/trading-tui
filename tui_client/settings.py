@@ -84,7 +84,7 @@ class NotificationSettings(BaseModel):
         return sorted(set(thresholds))
 
 
-REFRESH_INTERVAL_MINUTES = (5, 10, 15, 30, 60)
+REFRESH_INTERVAL_SECONDS = (5, 15, 30, 60, 300)
 
 
 class DisplaySettings(BaseModel):
@@ -94,13 +94,13 @@ class DisplaySettings(BaseModel):
     display_news: bool = True
     news_per_asset: int = Field(default=5, ge=1, le=5)
     stock_rotation_interval: int = Field(default=20, ge=1, le=3600)
-    refresh_interval_minutes: int = 15
+    refresh_interval_seconds: int = 15
 
-    @field_validator("refresh_interval_minutes")
+    @field_validator("refresh_interval_seconds")
     @classmethod
     def _valid_refresh(cls, v: int) -> int:
-        if v not in REFRESH_INTERVAL_MINUTES:
-            raise ValueError(f"refresh interval must be one of {REFRESH_INTERVAL_MINUTES}")
+        if v not in REFRESH_INTERVAL_SECONDS:
+            raise ValueError(f"refresh interval must be one of {REFRESH_INTERVAL_SECONDS}")
         return v
 
 

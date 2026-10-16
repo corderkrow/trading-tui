@@ -39,6 +39,10 @@ FILTER_SUFFIXES = {"k": 1e3, "m": 1e6, "b": 1e9}
 
 PAGE_SIZE = 25
 
+# Candles are daily, so refetch them no more often than this even when the
+# quote refresh interval is set to a few seconds.
+CANDLE_TTL_FLOOR_SECONDS = 300
+
 # key -> (field on QuoteView, label)
 SORT_FIELDS: dict[str, tuple[str, str]] = {
     "1": ("symbol", "Symbol"),
@@ -380,7 +384,7 @@ class PricesScreen(Screen[None]):
         self._display = display
 
     def apply_display(self, display) -> None:
-        """Restart the auto-refresh + rotation intervals from display settings."""
+        """Apply display settings; restart the quote-refresh and rotation timers."""
         self._display = display
         self._start_refresh_timer()
         self._start_rotation_timer()
@@ -389,10 +393,15 @@ class PricesScreen(Screen[None]):
         if self._refresh_timer is not None:
             self._refresh_timer.stop()
             self._refresh_timer = None
-        self._refresh_timer = self.set_timer(self._display.refresh_interval_minutes * 60, self._auto_refresh)
+        if self._display is None:
+            return
+        self._refresh_timer = self.set_interval(
+            self._display.refresh_interval_seconds, self._auto_reload
+        )
 
-    def _auto_refresh(self) -> None:
-        self._start_refresh_timer()
+    # Not `_auto_refresh`: Textual's DOMNode owns that attribute and would
+    # shadow this method, passing None as the timer callback.
+    def _auto_reload(self) -> None:
         self.run_worker(self.reload())
 
     def _start_rotation_timer(self) -> None:
@@ -668,10 +677,10 @@ class PricesScreen(Screen[None]):
         self._rebuild_table()
 
     def _candle_ttl(self) -> float:
-        """Candles go stale with the quote refresh cadence (5 min fallback)."""
+        """Daily candles go stale with the quote cadence, floored at 5 min."""
         if self._display is not None:
-            return self._display.refresh_interval_minutes * 60
-        return 300.0
+            return max(self._display.refresh_interval_seconds, CANDLE_TTL_FLOOR_SECONDS)
+        return float(CANDLE_TTL_FLOOR_SECONDS)
 
     async def _load_candles(self) -> None:
         """Fetch latest candle per row on the current page; cache by symbol."""

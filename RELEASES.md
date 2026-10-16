@@ -18,6 +18,13 @@ mirrored by the FastAPI app title (`app/main.py`). Tags are named `X.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Prices screen looked frozen**: quotes only re-fetched every 5-60 minutes
+  (default 15). Quote polling now follows the display refresh interval, which is
+  expressed in seconds — 5s / 15s / 30s / 1 min / 5 min, default **15s**. Daily
+  candles are refetched no more often than every 5 minutes.
+
 ### Planned
 
 - Live WebSocket market feed (`/market/ws`) — schema (`WSMsg`) exists, endpoint

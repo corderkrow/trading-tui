@@ -20,16 +20,32 @@ DELIVERIES = [
 THRESHOLD_CHOICES = [("≥ 2%", 2.0), ("≥ 5%", 5.0), ("≥ 20%", 20.0)]
 
 
+class _RadioSet(RadioSet):
+    """RadioSet whose keyboard highlight starts on the checked option.
+
+    Textual parks the cursor (the highlighted `-selected` row) on the first
+    button, so the highlight disagrees with the actual setting until the user
+    moves it. Put it on the pressed button instead.
+    """
+
+    def _post_mount(self) -> None:
+        super()._post_mount()
+        if self.pressed_index >= 0:
+            # shortcut: pokes Textual's private RadioSet._selected, revisit
+            # when Textual exposes a public cursor setter.
+            self._selected = self.pressed_index
+
+
 def _radio_set(options: list[tuple[str, str]], value: str, set_id: str) -> RadioSet:
     buttons = [
         RadioButton(label, name=opt_value, value=opt_value == value)
         for label, opt_value in options
     ]
-    return RadioSet(*buttons, id=set_id)
+    return _RadioSet(*buttons, id=set_id)
 
 
-VERSION = "0.2.1"
-REFRESH_CHOICES = [("5 min", 5), ("10 min", 10), ("15 min", 15), ("30 min", 30), ("1h", 60)]
+VERSION = "0.2.3"
+REFRESH_CHOICES = [("5s", 5), ("15s", 15), ("30s", 30), ("1 min", 60), ("5 min", 300)]
 
 
 class SettingsModal(ModalScreen[UserSettings | None]):
@@ -86,7 +102,7 @@ class SettingsModal(ModalScreen[UserSettings | None]):
             yield Label("Stock rotation interval (seconds)", classes="field-label")
             yield Input(id="rotation-interval", value=str(d.stock_rotation_interval))
             yield Label("Refresh interval", classes="field-label")
-            yield _radio_set([(label, str(v)) for label, v in REFRESH_CHOICES], str(d.refresh_interval_minutes), "refresh-interval")
+            yield _radio_set([(label, str(v)) for label, v in REFRESH_CHOICES], str(d.refresh_interval_seconds), "refresh-interval")
 
             yield Label("", id="error", classes="error")
             with Horizontal(id="modal-actions"):
@@ -193,14 +209,14 @@ class SettingsModal(ModalScreen[UserSettings | None]):
         refresh = self._radio_value("refresh-interval")
         if refresh is None:
             raise ValueError("Refresh interval required")
-        refresh_minutes = int(refresh)
+        refresh_seconds = int(refresh)
 
         display = {
             "disable_custom_alerts": self.query_one("#disable-custom-alerts", Checkbox).value,
             "display_news": self.query_one("#display-news", Checkbox).value,
             "news_per_asset": news_per_asset,
             "stock_rotation_interval": rotation,
-            "refresh_interval_minutes": refresh_minutes,
+            "refresh_interval_seconds": refresh_seconds,
         }
 
         notifications = {

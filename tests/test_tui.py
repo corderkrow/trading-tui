@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from rich.text import Text
-from textual.widgets import Button, DataTable, Input, Select, SelectionList, Static, Tabs
+from textual.widgets import Button, DataTable, Input, RadioButton, RadioSet, Select, SelectionList, Static, Tabs
 
 from tui_client.api import AlertView, ApiError, CandleView, QuoteView
 from tui_client.alerts.screens import (
@@ -912,6 +912,38 @@ async def test_candles_reused_when_cache_fresh(prices_app):
     assert calls == [], "fresh candle cache should not hit the API"
 
 
+async def test_prices_poll_uses_refresh_setting(prices_app):
+    """Quote polling cadence follows DisplaySettings.refresh_interval_seconds."""
+    app, pilot, api = prices_app
+    prices = app.screen.query_one("#prices-table", DataTable)
+    assert await wait_until(pilot, lambda: len(prices.rows) == 25)
+
+    timer = app.screen._refresh_timer
+    assert timer is not None
+    assert timer._interval == app.user.display.refresh_interval_seconds
+    assert timer._interval == 15
+
+    # Textual's DOMNode defines `_auto_refresh`; a method with that name is
+    # shadowed and the timer gets None as its callback, so it never polls.
+    assert timer._callback is not None
+    before = api.list_calls
+    timer._callback()
+    assert await wait_until(pilot, lambda: api.list_calls > before)
+
+
+async def test_alert_list_poll_callback_wired(pilot_app):
+    """The alert list's 15s tick reloads alerts instead of doing nothing."""
+    app, pilot, api = pilot_app
+    timer = app.screen._refresh_timer
+    assert timer is not None
+    assert timer._interval == 15.0
+    assert timer._callback is not None
+
+    before = api.list_calls
+    await timer._callback()
+    assert api.list_calls > before
+
+
 async def test_symbol_info_create_alert_flow(prices_app):
     app, pilot, api = prices_app
     prices = app.screen.query_one("#prices-table", DataTable)
@@ -1016,3 +1048,26 @@ async def test_settings_save_allows_empty_watchlist(monkeypatch):
         app.screen.query_one("#save", Button).press()
         assert await wait_until(pilot, lambda: not isinstance(app.screen, SettingsModal))
         assert app.user.watchlist.watchlists == {"default": []}
+
+
+async def test_settings_highlight_matches_selection_and_modal_centered():
+    """The radio highlight marks the checked option, not the first one, and the
+    dialog is centered (Textual 8 stopped centering modal screens by default)."""
+    from tui_client.settings import UserSettings
+
+    user = UserSettings()
+    user.watchlist.mode = "multiple"  # second wl-mode button
+    user.notifications.price_alert_delivery = "none"  # last delivery button
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("o")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, SettingsModal))
+
+        for radio_set in app.screen.query(RadioSet):
+            marked = [
+                b.name for b in radio_set.query(RadioButton) if b.has_class("-selected")
+            ]
+            assert marked == [radio_set.pressed_button.name]
+
+        assert app.screen.styles.align_horizontal == "center"
+        assert app.screen.styles.align_vertical == "middle"

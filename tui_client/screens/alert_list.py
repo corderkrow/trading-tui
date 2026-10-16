@@ -44,6 +44,7 @@ class AlertListScreen(Screen[None]):
         super().__init__()
         self.api = api
         self.default_symbol = default_symbol
+        self._refresh_timer = None
         self._alerts: list[AlertView] = []
         self._events: list[AlertEventView] = []
         self._quotes: dict[str, QuoteView] = {}
@@ -71,7 +72,7 @@ class AlertListScreen(Screen[None]):
         self.run_worker(self.reload())
         # Stored alerts fire server-side now; keep the table and the event
         # feed fresh without manual `r` presses.
-        self.set_interval(15.0, self._auto_refresh)
+        self._refresh_timer = self.set_interval(15.0, self._auto_reload)
 
     async def reload(self) -> None:
         try:
@@ -107,7 +108,9 @@ class AlertListScreen(Screen[None]):
         else:
             hint.update("No alerts yet — press n to create one")
 
-    async def _auto_refresh(self) -> None:
+    # Not `_auto_refresh`: Textual's DOMNode owns that attribute and would
+    # shadow this method, passing None as the timer callback.
+    async def _auto_reload(self) -> None:
         """Poll alerts + event feed; toast on events the user hasn't seen."""
         await self.reload()
         list_events = getattr(self.api, "list_events", None)
