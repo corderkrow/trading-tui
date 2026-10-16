@@ -24,7 +24,13 @@ with async-first design patterns for zero-latency data streams.
   combination, once-only or every-time triggering, expiration, custom messages,
   and notification channels.
 - **Alert evaluation**: `AlertService` reacts to price updates (observer-style
-  `handle_price`) without coupling market data to alerts.
+  `handle_price`) without coupling market data to alerts. A server-side
+  `BackgroundAlertEvaluator` polls the adapter every 30s for symbols holding
+  active alerts, feeds their ticks in, and sweeps dropped symbols so statuses
+  stay truthful without a client.
+- **Fired-event log**: `in_app` events are capped in memory and served by
+  `GET /alerts/events` (newest first); the TUI refreshes the feed every 15s and
+  toasts newly fired alerts.
 - **Notification channels**: extensible channel abstraction (`in_app` is
   implemented; `toast`/`sound`/`push`/`email` are registered no-op
   placeholders). A global delivery preference filters which channels may fire.
@@ -36,8 +42,13 @@ with async-first design patterns for zero-latency data streams.
   - Sortable (`1`-`5`), paginated (`[` / `]`, 25 rows), searchable (`/`) and
     change-filtered (`f`/`u`/`d`) table with price, 24h change %, latest OHLC
     and per-symbol alert state.
+  - Watchlist editing (`n` new, `e` edit, `D` delete; `+`/`x` add/remove symbol).
+  - **Symbol info** (`enter`): quote stats plus latest news for the symbol.
   - Alerts list (`a`, `p` back): create modal with inline validation,
-    enable/disable/delete.
+    enable/disable/delete, live event feed.
+  - **Multi-condition alert editor**: up to 5 conditions with AND/OR match,
+    once/every-time trigger, expiration and message; symbol field with
+    autocomplete over the market search endpoint.
   - Settings modal (`o`): watchlist mode, lists, price-change sources,
     thresholds and delivery.
 - **Background price monitor**: TUI worker polls quotes every 60s and fires a
@@ -130,6 +141,8 @@ universe via `GET /market/screener` (filters: `region`, `sector`, `mincap`,
 |--------|------|-------------|
 | GET | `/market/candles?symbol=BTCUSDT&interval=1h&limit=500` | OHLCV candles |
 | GET | `/market/quotes?symbols=BTCUSDT,ETHUSDT` | Latest prices |
+| GET | `/market/search?q=appl` | Symbol search (autocomplete, symbol info lookup) |
+| GET | `/market/news?symbol=AAPL` | Latest news headlines for a symbol |
 | GET | `/market/screeners?scr_id=most_actives&count=250` | Predefined Yahoo screeners (`most_actives`/`gainers`/`losers`) |
 | GET | `/market/screener?region=us&sector=technology&mincap=1e9&sort=percentchange&size=50&offset=0` | Custom screener over the full universe |
 
@@ -138,6 +151,7 @@ universe via `GET /market/screener` (filters: `region`, `sector`, `mincap`,
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/alerts` | List alerts (expired ones auto-flagged) |
+| GET | `/alerts/events?limit=50` | Recent fired-alert events, newest first |
 | POST | `/alerts` | Create an alert (201) |
 | GET | `/alerts/{alert_id}` | Get one alert |
 | DELETE | `/alerts/{alert_id}` | Delete an alert (204) |
@@ -197,6 +211,10 @@ AlertService.handle_price(symbol, price)   ← Observer entry point
   threshold toast) and persists user settings to JSON
   (`tui_client/settings.py`). The API reads only the delivery preference from
   that file (`app/services/user_prefs.py`) to filter notification channels.
+- `BackgroundAlertEvaluator` (`app/services/alerts/evaluator.py`) owns the
+  server-side poll loop; `create_app` sets one adapter per process and closes it
+  on lifespan shutdown. The TUI's multi-condition alert editor is a separate,
+  Textual-free package (`tui_client/alerts/`: model + engine + widgets).
 
 ## Tests
 
@@ -206,13 +224,16 @@ pytest
 
 Covers condition edge cases (including crossing transitions), alert lifecycle
 (ACTIVE→TRIGGERED/EXPIRED, DISABLED skip, once-only), ALL/ANY combination,
-notification emission (mocked channels), the full REST surface (CRUD,
-validation errors, status codes), and TUI flows via Textual's pilot (open
-modal, add condition, create, validation, cancel: no sleeps).
+notification emission and delivery filtering, the full REST surface (CRUD,
+search/news, validation errors, status codes), the background evaluator, and
+TUI flows via Textual's pilot (open modal, add condition, create, validation,
+cancel: no sleeps).
 
-Test modules: `test_conditions`, `test_alert_service`, `test_repository`,
+Test modules: `test_conditions`, `test_models`, `test_engine`,
+`test_alert_service`, `test_alerts_coverage`, `test_repository`,
 `test_sqlite_repository`, `test_api_alerts`, `test_api_market`,
-`test_notifications_delivery`, `test_settings`, `test_tui`.
+`test_yahoo_adapter`, `test_notifications_delivery`, `test_settings`,
+`test_alert_screen`, `test_tui`.
 
 ## Versioning
 
@@ -227,23 +248,29 @@ release history and full policy.
 ### Done
 
 - [x] Async FastAPI backend with adapter registry + DI composition root.
-- [x] Adapters: `yahoo` (candles, quotes, predefined screeners, custom
-  screener with cookie+crumb auth) and `binance` (candles, quotes).
+- [x] Adapters: `yahoo` (candles, quotes, search, news, predefined screeners,
+  custom screener with cookie+crumb auth) and `binance` (candles, quotes only).
 - [x] Market REST: `/market/candles`, `/market/quotes`, `/market/screeners`,
-  `/market/screener`.
+  `/market/screener`, `/market/search`, `/market/news`.
 - [x] Alert domain, condition strategies (above/below/crossing), ALL/ANY and
   once/every-time modes, expiration, status lifecycle.
 - [x] Alerts REST CRUD + `/alerts/evaluate`; structured errors, no stack leaks.
 - [x] SQLite persistence (`aiosqlite`, WAL) with in-memory repo for tests.
-- [x] Notification channel abstraction + `in_app`; global delivery filter.
+- [x] Notification channel abstraction + `in_app`; global delivery filter,
+  capped in-memory event log served by `GET /alerts/events`.
+- [x] Server-side alert evaluation: `BackgroundAlertEvaluator` polls the adapter
+  every 30s and feeds `handle_price` (no client push needed).
 - [x] Textual TUI: prices/watchlist/screener table, sort/filter/search/page,
-  multi-watchlist, alert list + create modal, settings modal.
+  multi-watchlist with editing, symbol autocomplete, symbol info + news,
+  multi-condition alert editor, alert list with event feed, settings modal.
 - [x] Background threshold monitor (60s poll → toast, re-arming).
+- [x] Process-wide adapter lifecycle (one adapter per process, closed on
+  lifespan shutdown).
 - [x] Currency formatting (16 currencies); persisted user settings JSON.
 - [x] Console scripts, `install.sh`, Dockerfile, `docker-compose.yml`,
-  `.env.example`.
-- [x] Test suite: conditions, service, repositories, REST, notifications,
-  settings, TUI pilot.
+  `.env.example`; alert benchmarks under `benchmarks/`.
+- [x] Test suite: conditions, model, engine, service, repositories, REST,
+  notifications, settings, Yahoo adapter, TUI pilot (alerts + editor).
 
 ### To cover (roadmap)
 
@@ -256,13 +283,8 @@ release history and full policy.
   returns nothing for it (no holdings feature yet).
 - [ ] **Charts & indicators**: `plotly` is a dependency but candlestick
   rendering / technical indicators are not implemented; the TUI shows OHLC only.
-- [ ] **Binance screeners**: `fetch_screeners` / `fetch_screener_search` raise
-  `NotImplementedError` (HTTP 400).
-- [ ] **Auto alert evaluation**: alerts fire only via `POST /alerts/evaluate`;
-  wire the price monitor / market stream into `AlertService.handle_price`.
-- [ ] **In-app notification log**: `InAppChannel` keeps events in memory but
-  the TUI does not surface them yet.
-- [ ] **Adapter lifecycle**: adapters are built per request (no shared HTTP
-  client); move to a managed lifespan.
+- [ ] **Binance screeners / search / news**: the base adapter raises
+  `NotImplementedError` for `fetch_screeners`, `fetch_screener_search`,
+  `search_symbols` and `fetch_news` (HTTP 400); only Yahoo implements them.
 - [ ] **Project tooling**: no linter/formatter/typechecker, CI, or release
-  automation yet; add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `RELEASES.md`.
+  automation yet; `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` are still missing.
