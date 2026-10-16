@@ -9,15 +9,15 @@ from rich.text import Text
 from textual.widgets import Button, DataTable, Input, Select, SelectionList, Static, Tabs
 
 from tui_client.api import AlertView, ApiError, CandleView, QuoteView
-from tui_client.alerts.screens import AlertScreen
-from tui_client.app import AlertsApp
-from tui_client.screens.alert_list import AlertListScreen
-from tui_client.screens.create_alert import (
-    CreateAlertModal,
+from tui_client.alerts.screens import (
+    AlertScreen,
+    ConditionEditorScreen,
     ExpirationScreen,
     MessageScreen,
     NotificationsScreen,
 )
+from tui_client.app import AlertsApp
+from tui_client.screens.alert_list import AlertListScreen
 from tui_client.screens.prices import (
     DEFAULT_WATCHLIST,
     AddSymbolModal,
@@ -155,10 +155,10 @@ def plain(cell: str) -> str:
 
 
 def modal_open(app) -> bool:
-    return isinstance(app.screen, CreateAlertModal)
+    return isinstance(app.screen, AlertScreen)
 
 
-def open_modal(pilot) -> CreateAlertModal:
+def open_modal(pilot) -> AlertScreen:
     return pilot.app.screen  # modal is the top screen
 
 
@@ -263,7 +263,7 @@ async def test_create_alert_full_flow(pilot_app):
     modal.query_one("#symbol", Input).value = "ETH-USD"
     modal.query_one("#value", Input).value = "4000"
     await pilot.pause()
-    assert modal.query_one("#message", Button).label.plain == "ETH-USD Crossing 4000 >"
+    assert modal.query_one("#message", Button).label.plain == "ETH-USD Price Crossing 4,000.00 >"
 
     modal.query_one("#create", Button).press()
     assert await wait_until(pilot, lambda: len(api.created) == 1)
@@ -274,7 +274,7 @@ async def test_create_alert_full_flow(pilot_app):
     assert payload["conditions"] == [{"metric": "price", "operator": "crossing", "value": 4000.0}]
     assert payload["trigger_mode"] == "ONCE"
     assert payload["notification_channels"] == ["in_app", "toast", "sound"]
-    assert payload["message"] == "ETH-USD Crossing 4000"
+    assert payload["message"] == "ETH-USD Price Crossing 4,000.00"
     assert await wait_until(pilot, lambda: table_rows(app) == 3)  # 2 original + 1 new
 
 
@@ -301,7 +301,7 @@ async def test_create_alert_symbol_autocomplete(pilot_app):
     await pilot.press("enter")
     assert await wait_until(pilot, lambda: symbol.value == "ETH-USD")
     assert await wait_until(pilot, lambda: not autocomplete.display)
-    assert modal.query_one("#message", Button).label.plain == "ETH-USD Crossing 0.00 >"
+    assert modal.query_one("#message", Button).label.plain == "ETH-USD Price Crossing 0.00 >"
 
 
 async def test_create_alert_symbol_search_error_keeps_modal(pilot_app):
@@ -333,7 +333,7 @@ async def test_message_auto_updates_until_edited(pilot_app):
     modal.query_one("#operator", Select).value = "Greater than"
     modal.query_one("#value", Input).value = "100"
     await pilot.pause()
-    assert modal.query_one("#message", Button).label.plain == "BTCUSDT Greater than 100 >"
+    assert modal.query_one("#message", Button).label.plain == "BTCUSDT Price Greater than 100.00 >"
 
     # user edit wins — later changes no longer regenerate the message
     modal._handle_message("custom {{ticker}} text")
@@ -348,11 +348,15 @@ async def test_add_second_condition(pilot_app):
     assert await wait_until(pilot, lambda: modal_open(app))
     modal = open_modal(pilot)
 
-    await pilot.press("ctrl+n")
-    assert await wait_until(pilot, lambda: bool(modal.query("#value-1")))
-
     modal.query_one("#value", Input).value = "100000"
-    modal.query_one("#value-1", Input).value = "90000"
+    await pilot.pause()
+    await pilot.press("ctrl+n")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, ConditionEditorScreen))
+    app.screen.query_one("#value", Input).value = "90000"
+    await pilot.pause()
+    await pilot.press("ctrl+s")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+
     modal.query_one("#create", Button).press()
 
     assert await wait_until(pilot, lambda: len(api.created) == 1)
@@ -732,7 +736,7 @@ async def test_alert_creation_after_deleting_active_watchlist(monkeypatch):
         await pilot.press("a")
         assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
         await pilot.press("n")
-        assert await wait_until(pilot, lambda: isinstance(app.screen, CreateAlertModal))
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
         app.screen.query_one("#symbol", Input).value = "BTCUSDT"
         app.screen.query_one("#value", Input).value = "50000"
         await pilot.pause()

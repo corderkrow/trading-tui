@@ -11,7 +11,6 @@ from textual.widgets import DataTable, Footer, Static, Tab, Tabs
 from tui_client.alerts.models import AlertSpec
 from tui_client.alerts.screens import AlertScreen
 from tui_client.api import AlertApiClient, AlertEventView, AlertView, ApiError
-from tui_client.screens.create_alert import AlertSpec as CreateAlertSpec, CreateAlertModal
 from tui_client.screens.prices import (
     ALERT_STATE_LABELS,
     MARKET_TABS,
@@ -148,19 +147,19 @@ class AlertListScreen(Screen[None]):
         if display is not None and display.disable_custom_alerts:
             self.notify("Custom alerts are disabled in settings", severity="warning")
             return
-        modal = CreateAlertModal(
+        modal = AlertScreen(
             default_symbol=self.default_symbol,
             symbols=self._symbol_options(),
             api=self.api,
         )
         self.app.push_screen(modal, callback=self._on_modal_result)
 
-    def _on_modal_result(self, spec: CreateAlertSpec | None) -> None:
+    def _on_modal_result(self, spec: AlertSpec | None) -> None:
         if spec is None:
             return
         self.run_worker(self._create(spec))
 
-    async def _create(self, spec: CreateAlertSpec) -> None:
+    async def _create(self, spec: AlertSpec) -> None:
         try:
             await self.api.create_alert(spec.to_payload())
         except ApiError as exc:
