@@ -1,6 +1,18 @@
 """Shared test helpers."""
 
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+# Tests must not read the developer's real ~/.config/trading-tui/settings.json
+# (its watchlist may be empty or customized). Point the settings path at a
+# fresh empty file so load_settings() falls back to defaults. Must run before
+# tui_client.settings is imported.
+os.environ.setdefault(
+    "TRADING_TUI_SETTINGS",
+    str(Path(tempfile.mkdtemp(prefix="trading-tui-tests-")) / "settings.json"),
+)
 
 
 class FakeClock:
