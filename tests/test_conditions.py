@@ -1,11 +1,21 @@
 """Condition strategy tests — including crossing edge cases."""
 
+import pytest
+
 from app.services.alerts.conditions import build_condition
-from app.services.alerts.domain import ConditionSpec, MarketContext, Operator
+from app.services.alerts.domain import (
+    CHANGE_OPERATORS,
+    ConditionSpec,
+    MarketContext,
+    Operator,
+)
+from app.services.alerts.errors import InvalidAlertCondition
 
 
 def cond(operator: Operator, value: float):
-    return build_condition(ConditionSpec(operator=operator, value=value))
+    # Change-based operators require the change_pct metric to be valid.
+    metric = "change_pct" if operator in CHANGE_OPERATORS else "price"
+    return build_condition(ConditionSpec(operator=operator, value=value, metric=metric))
 
 
 def ctx(price: float, previous: float | None = None) -> MarketContext:
@@ -58,6 +68,38 @@ def test_no_crossing_without_crossing_the_target():
     assert not c.evaluate(ctx(101, previous=102))
     assert not c.evaluate(ctx(99, previous=99))
     assert not c.evaluate(ctx(101, previous=101))
+
+
+def test_crossing_up_only_upward():
+    c = cond(Operator.CROSSING_UP, 100)
+    assert not c.evaluate(ctx(101, previous=None))  # needs history
+    assert c.evaluate(ctx(100, previous=99))
+    assert c.evaluate(ctx(101, previous=99))
+    # a downward transition is not a crossing up
+    assert not c.evaluate(ctx(99, previous=101))
+    # starting at the target and moving away is not a crossing
+    assert not c.evaluate(ctx(101, previous=100))
+
+
+def test_crossing_down_only_downward():
+    c = cond(Operator.CROSSING_DOWN, 100)
+    assert not c.evaluate(ctx(99, previous=None))  # needs history
+    assert c.evaluate(ctx(100, previous=101))
+    assert c.evaluate(ctx(99, previous=101))
+    # an upward transition is not a crossing down
+    assert not c.evaluate(ctx(101, previous=99))
+    assert not c.evaluate(ctx(99, previous=100))
+
+
+def test_metric_operator_mismatch_rejected():
+    with pytest.raises(InvalidAlertCondition):
+        build_condition(
+            ConditionSpec(operator=Operator.ABOVE, value=100, metric="change_pct")
+        )
+    with pytest.raises(InvalidAlertCondition):
+        build_condition(
+            ConditionSpec(operator=Operator.RISES_BY, value=2, metric="price")
+        )
 
 
 def ctx_change(

@@ -8,9 +8,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.services.alerts.domain import (
+    CHANGE_METRIC,
+    CHANGE_OPERATORS,
+    PRICE_OPERATORS,
     Alert,
     AlertEvent,
     AlertStatus,
@@ -31,6 +34,16 @@ class ConditionRequest(BaseModel):
         gt=0,
         description="Target value, must be > 0 (percent for change-based metrics)",
     )
+
+    @model_validator(mode="after")
+    def _operator_matches_metric(self) -> "ConditionRequest":
+        """Reject operator/metric pairs that would evaluate the wrong quantity."""
+        allowed = CHANGE_OPERATORS if self.metric == CHANGE_METRIC else PRICE_OPERATORS
+        if self.operator not in allowed:
+            raise ValueError(
+                f"operator '{self.operator.value}' is not valid for metric '{self.metric}'"
+            )
+        return self
 
     def to_spec(self) -> ConditionSpec:
         return ConditionSpec(operator=self.operator, value=self.value, metric=self.metric)

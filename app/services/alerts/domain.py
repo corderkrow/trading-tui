@@ -34,6 +34,8 @@ class Operator(StrEnum):
     ABOVE = "above"
     BELOW = "below"
     CROSSING = "crossing"
+    CROSSING_UP = "crossing_up"
+    CROSSING_DOWN = "crossing_down"
     RISES_BY = "rises_by"
     FALLS_BY = "falls_by"
     TURNS_POSITIVE = "turns_positive"
@@ -44,11 +46,34 @@ OPERATOR_LABEL: dict[Operator, str] = {
     Operator.ABOVE: "Above",
     Operator.BELOW: "Below",
     Operator.CROSSING: "Crossing",
+    Operator.CROSSING_UP: "Crossing up",
+    Operator.CROSSING_DOWN: "Crossing down",
     Operator.RISES_BY: "Rises by",
     Operator.FALLS_BY: "Falls by",
     Operator.TURNS_POSITIVE: "Turns positive",
     Operator.TURNS_NEGATIVE: "Turns negative",
 }
+
+# Operators valid for each metric. A price operator compared against a percent
+# metric (or the reverse) would silently evaluate the wrong quantity, so the API
+# rejects those combinations at the trust boundary.
+PRICE_OPERATORS = frozenset(
+    {
+        Operator.ABOVE,
+        Operator.BELOW,
+        Operator.CROSSING,
+        Operator.CROSSING_UP,
+        Operator.CROSSING_DOWN,
+    }
+)
+CHANGE_OPERATORS = frozenset(
+    {
+        Operator.RISES_BY,
+        Operator.FALLS_BY,
+        Operator.TURNS_POSITIVE,
+        Operator.TURNS_NEGATIVE,
+    }
+)
 
 # Metrics tracked between consecutive price ticks (percent change, ...).
 CHANGE_METRIC = "change_pct"

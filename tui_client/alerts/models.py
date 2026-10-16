@@ -49,8 +49,8 @@ DEFAULT_NOTIFICATIONS = ["App", "Toasts", "Sound"]
 # approximates to a price metric (same reduction the legacy dialog used).
 OPERATOR_BACKEND: dict[str, tuple[str, str]] = {
     "Crossing": ("crossing", "price"),
-    "Crossing up": ("crossing", "price"),
-    "Crossing down": ("crossing", "price"),
+    "Crossing up": ("crossing_up", "price"),
+    "Crossing down": ("crossing_down", "price"),
     "Greater than": ("above", "price"),
     "Less than": ("below", "price"),
 }
@@ -71,12 +71,12 @@ NOTIFICATION_BACKEND = {
 # Backend -> UI (used when editing an existing alert back into the dialog).
 OPERATOR_UI: dict[tuple[str, str], str] = {
     ("crossing", "price"): "Crossing",
+    ("crossing_up", "price"): "Crossing up",
+    ("crossing_down", "price"): "Crossing down",
     ("above", "price"): "Greater than",
     ("below", "price"): "Less than",
     ("rises_by", "change_pct"): "Greater than",
     ("falls_by", "change_pct"): "Less than",
-    ("turns_positive", "price"): "Crossing up",
-    ("turns_negative", "price"): "Crossing down",
 }
 TRIGGER_UI = {"ONCE": "Once only", "EVERY_TIME": "Once per bar"}
 NOTIFICATION_UI = {backend: ui for ui, backend in NOTIFICATION_BACKEND.items()}

@@ -137,6 +137,28 @@ async def test_multiple_crossing_alerts_same_symbol_share_baseline():
     assert {e.alert_id for e in fired} == {a.id for a in await service.list()}
 
 
+async def test_directional_crossing_alerts_fire_only_their_direction():
+    clock = _clock()
+    service, _ = make_service(clock=clock)
+    await service.create(
+        make_request(conditions=[{"operator": "crossing_up", "value": 100.0}])
+    )
+    await service.create(
+        make_request(conditions=[{"operator": "crossing_down", "value": 100.0}])
+    )
+    await service.handle_price("ETHUSDT", 99.0, at=clock())  # baseline below
+    up = await service.handle_price("ETHUSDT", 101.0, at=clock())  # cross up
+    assert [e.conditions[0].operator.value for e in up] == ["crossing_up"]
+    # re-arm and cross back down
+    service, _ = make_service(clock=clock)
+    await service.create(
+        make_request(conditions=[{"operator": "crossing_down", "value": 100.0}])
+    )
+    await service.handle_price("ETHUSDT", 101.0, at=clock())
+    down = await service.handle_price("ETHUSDT", 99.0, at=clock())
+    assert len(down) == 1
+
+
 async def test_expired_alert_not_evaluated():
     clock = _clock()
     service, channel = make_service(clock=clock, channel=FakeChannel())

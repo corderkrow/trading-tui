@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.services.alerts.domain import ConditionSpec, MarketContext, Operator
+from app.services.alerts.domain import (
+    CHANGE_METRIC,
+    CHANGE_OPERATORS,
+    PRICE_OPERATORS,
+    ConditionSpec,
+    MarketContext,
+    Operator,
+)
 
 
 class Condition(Protocol):
@@ -46,6 +53,30 @@ class PriceCrossingCondition:
         crossed_up = context.previous_price < target and context.price >= target
         crossed_down = context.previous_price > target and context.price <= target
         return crossed_up or crossed_down
+
+
+class PriceCrossingUpCondition:
+    """Fires only on an upward transition through the target."""
+
+    def __init__(self, spec: ConditionSpec):
+        self.spec = spec
+
+    def evaluate(self, context: MarketContext) -> bool:
+        if context.previous_price is None:
+            return False
+        return context.previous_price < self.spec.value <= context.price
+
+
+class PriceCrossingDownCondition:
+    """Fires only on a downward transition through the target."""
+
+    def __init__(self, spec: ConditionSpec):
+        self.spec = spec
+
+    def evaluate(self, context: MarketContext) -> bool:
+        if context.previous_price is None:
+            return False
+        return context.previous_price > self.spec.value >= context.price
 
 
 class _ChangePercentCondition:
@@ -94,6 +125,8 @@ _STRATEGIES: dict[Operator, type[Condition]] = {
     Operator.ABOVE: PriceAboveCondition,
     Operator.BELOW: PriceBelowCondition,
     Operator.CROSSING: PriceCrossingCondition,
+    Operator.CROSSING_UP: PriceCrossingUpCondition,
+    Operator.CROSSING_DOWN: PriceCrossingDownCondition,
     Operator.RISES_BY: PriceRisesByCondition,
     Operator.FALLS_BY: PriceFallsByCondition,
     Operator.TURNS_POSITIVE: PriceTurnsPositiveCondition,
@@ -103,10 +136,15 @@ _STRATEGIES: dict[Operator, type[Condition]] = {
 
 def build_condition(spec: ConditionSpec) -> Condition:
     """Factory mapping a ConditionSpec to its strategy implementation."""
+    from app.services.alerts.errors import InvalidAlertCondition
+
     try:
         strategy_cls = _STRATEGIES[spec.operator]
     except KeyError:
-        from app.services.alerts.errors import InvalidAlertCondition
-
         raise InvalidAlertCondition(f"Unsupported operator: {spec.operator}") from None
+    allowed = CHANGE_OPERATORS if spec.metric == CHANGE_METRIC else PRICE_OPERATORS
+    if spec.operator not in allowed:
+        raise InvalidAlertCondition(
+            f"Operator '{spec.operator.value}' is not valid for metric '{spec.metric}'"
+        )
     return strategy_cls(spec)

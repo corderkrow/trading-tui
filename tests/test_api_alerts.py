@@ -135,11 +135,24 @@ async def test_validation_errors():
             payload(notification_channels=[]),            # at least one channel
             payload(notification_channels=["slack"]),     # unknown channel
             payload(conditions=[{"operator": "sideways", "value": 1}]),  # bad operator
+            payload(conditions=[{"operator": "above", "metric": "change_pct", "value": 1}]),
+            payload(conditions=[{"operator": "rises_by", "value": 1}]),  # needs change_pct
         ]
         for body in cases:
             resp = await client.post("/alerts", json=body)
             assert resp.status_code == 422, f"expected 422 for {body}"
             assert "detail" in resp.json()
+
+
+async def test_create_directional_crossing_alerts():
+    async with make_client() as client:
+        for operator in ("crossing_up", "crossing_down"):
+            resp = await client.post(
+                "/alerts",
+                json=payload(conditions=[{"operator": operator, "value": 100.0}]),
+            )
+            assert resp.status_code == 201, resp.text
+            assert resp.json()["conditions"][0]["operator"] == operator
 
 
 async def test_evaluate_triggers_once_only():

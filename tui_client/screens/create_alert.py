@@ -36,8 +36,6 @@ OPERATORS = [
     "Crossing down",
     "Greater than",
     "Less than",
-    "Entering channel",
-    "Exiting channel",
     "Moving up %",
     "Moving down %",
 ]
@@ -49,8 +47,6 @@ OPERATOR_ICONS = {
     "Crossing down": "↘",
     "Greater than": ">",
     "Less than": "<",
-    "Entering channel": "⤫",
-    "Exiting channel": "⤫",
     "Moving up %": "↗",
     "Moving down %": "↘",
 }
@@ -59,12 +55,10 @@ OPERATOR_ICONS = {
 # (multi-condition UI ships ahead of the evaluator, hence the approximation)
 OPERATOR_BACKEND: dict[str, tuple[str, str]] = {
     "Crossing": ("crossing", "price"),
-    "Crossing up": ("crossing", "price"),
-    "Crossing down": ("crossing", "price"),
+    "Crossing up": ("crossing_up", "price"),
+    "Crossing down": ("crossing_down", "price"),
     "Greater than": ("above", "price"),
     "Less than": ("below", "price"),
-    "Entering channel": ("crossing", "price"),
-    "Exiting channel": ("crossing", "price"),
     "Moving up %": ("rises_by", "change_pct"),
     "Moving down %": ("falls_by", "change_pct"),
 }
