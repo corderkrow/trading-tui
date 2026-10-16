@@ -121,6 +121,22 @@ async def test_crossing_detected_across_ticks():
     assert len(fired) == 1
 
 
+async def test_multiple_crossing_alerts_same_symbol_share_baseline():
+    """A second alert on a symbol must still see the crossing the first saw.
+
+    Regression: the tick baseline used to advance inside each alert's own
+    evaluation, so the first alert overwrote it and every later alert on the
+    same symbol never detected a crossing.
+    """
+    clock = _clock()
+    service, _ = make_service(clock=clock)
+    await service.create(make_request(conditions=[{"operator": "crossing", "value": 100.0}]))
+    await service.create(make_request(conditions=[{"operator": "crossing", "value": 90.0}]))
+    await service.handle_price("ETHUSDT", 85.0, at=clock())  # below both — baseline
+    fired = await service.handle_price("ETHUSDT", 105.0, at=clock())  # above both
+    assert {e.alert_id for e in fired} == {a.id for a in await service.list()}
+
+
 async def test_expired_alert_not_evaluated():
     clock = _clock()
     service, channel = make_service(clock=clock, channel=FakeChannel())

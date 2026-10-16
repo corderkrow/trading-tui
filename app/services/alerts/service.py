@@ -123,6 +123,11 @@ class AlertService:
     async def handle_price(self, symbol: str, price: float, at: datetime | None = None) -> list[AlertEvent]:
         """Observer entry point: react to a market price update."""
         now = at or self._clock()
+        # Read the tick baseline once, before any alert is evaluated: every
+        # alert on this symbol must see the same previous price.
+        previous_price = self._previous_prices.get(symbol)
+        change = self._percent_change(previous_price, price)
+        previous_change = self._previous_changes.get(symbol)
         triggered: list[AlertEvent] = []
         evaluated: list[Alert] = []
         for alert in await self.repository.list():
@@ -133,7 +138,7 @@ class AlertService:
                 continue
             if self._is_expired(alert, now):
                 alert.status = AlertStatus.EXPIRED
-            elif await self._matches(alert, symbol, price, now):
+            elif self._matches(alert, previous_price, change, previous_change, price, now):
                 event = AlertEvent(
                     alert_id=alert.id,
                     symbol=symbol,
@@ -147,6 +152,11 @@ class AlertService:
                     alert.triggered_at = now
             alert.last_evaluated_at = now
             evaluated.append(alert)
+        # Advance the symbol's baseline once, after every alert saw it. Updating
+        # it per-alert would let the first alert hide the others' crossings.
+        self._previous_prices[symbol] = price
+        if change is not None:
+            self._previous_changes[symbol] = change
         if evaluated:
             # one transaction per tick instead of one commit per alert
             await self.repository.update_many(evaluated)
@@ -193,12 +203,18 @@ class AlertService:
             await self.repository.update_many(stale)
         return len(stale)
 
-    async def _matches(self, alert: Alert, symbol: str, price: float, now: datetime) -> bool:
-        previous_price = self._previous_prices.get(symbol)
-        change = self._percent_change(previous_price, price)
-        previous_change = self._previous_changes.get(symbol)
+    def _matches(
+        self,
+        alert: Alert,
+        previous_price: float | None,
+        change: float | None,
+        previous_change: float | None,
+        price: float,
+        now: datetime,
+    ) -> bool:
+        """Evaluate one alert against the tick. Pure — no baseline bookkeeping."""
         context = MarketContext(
-            symbol=symbol,
+            symbol=alert.symbol,
             price=price,
             previous_price=previous_price,
             change=change,
@@ -207,13 +223,8 @@ class AlertService:
         )
         results = [build_condition(spec).evaluate(context) for spec in alert.conditions]
         if alert.match_mode == MatchMode.ANY:
-            matched = any(results)
-        else:
-            matched = all(results)
-        self._previous_prices[symbol] = price
-        if change is not None:
-            self._previous_changes[symbol] = change
-        return matched
+            return any(results)
+        return all(results)
 
     @staticmethod
     def _percent_change(previous_price: float | None, price: float) -> float | None:
