@@ -343,6 +343,47 @@ async def test_message_auto_updates_until_edited(pilot_app):
     assert modal.query_one("#message", Button).label.plain == "custom {{ticker}} text >"
 
 
+async def test_create_alert_focuses_symbol_and_clears_value(pilot_app):
+    app, pilot, _ = pilot_app
+    await pilot.press("n")
+    assert await wait_until(pilot, lambda: modal_open(app))
+    modal = open_modal(pilot)
+    symbol = modal.query_one("#symbol", Input)
+    value = modal.query_one("#value", Input)
+
+    assert await wait_until(pilot, lambda: symbol.has_focus)
+    assert value.value == "0.00"
+
+    value.focus()
+    await pilot.pause()
+    assert value.value == ""
+
+
+async def test_edit_refreshes_placeholder_message(pilot_app):
+    app, pilot, _ = pilot_app
+    assert await wait_until(pilot, lambda: table_rows(app) == 2)
+    table = app.screen.query_one("#alerts-table", DataTable)
+    table.move_cursor(row=0)  # ETHUSDT, message "ETHUSDT Crossing 3794.94"
+    await pilot.pause()
+    await pilot.press("enter")
+    assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+    modal = app.screen
+    assert await wait_until(pilot, lambda: bool(modal.query("#value")))
+
+    # auto-generated message follows the edited value
+    modal.query_one("#value", Input).value = "250"
+    await pilot.pause()
+    assert modal.query_one("#message", Button).label.plain == (
+        "ETHUSDT Price Crossing 250.00 >"
+    )
+
+    # a user-written message stays untouched
+    modal._handle_message("my custom alert")
+    modal.query_one("#value", Input).value = "300"
+    await pilot.pause()
+    assert modal.query_one("#message", Button).label.plain == "my custom alert >"
+
+
 async def test_add_second_condition(pilot_app):
     app, pilot, api = pilot_app
     await pilot.press("n")

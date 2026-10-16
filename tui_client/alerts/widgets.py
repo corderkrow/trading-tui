@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from textual import events
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
@@ -22,6 +23,13 @@ class PriceInput(Input):
     ]
 
     tick = 0.01
+    # Cleared on first focus so the user can type instead of deleting "0.00".
+    _clear_on_focus = True
+
+    def on_focus(self, event: events.Focus) -> None:
+        if self._clear_on_focus:
+            self._clear_on_focus = False
+            self.value = ""
 
     def action_step(self, factor: int) -> None:
         try:
