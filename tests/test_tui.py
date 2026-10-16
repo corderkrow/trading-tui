@@ -25,6 +25,7 @@ from tui_client.screens.prices import (
     NameModal,
     PricesScreen,
 )
+from tui_client.screens.settings import SettingsModal
 from tui_client.screens.symbol_info import SymbolInfoScreen
 from tui_client.themes import DANGER, SUCCESS
 from tui_client.widgets import SymbolAutoComplete
@@ -951,3 +952,20 @@ async def test_alert_list_row_selected_opens_editor_and_updates(pilot_app):
     assert alert_id == "id-ETHUSDT"
     assert payload["conditions"][0]["value"] == 250.0
     assert await wait_until(pilot, lambda: isinstance(app.screen, AlertListScreen))
+
+
+async def test_settings_save_allows_empty_watchlist(monkeypatch):
+    """An empty-symbol watchlist (created when the last list is deleted) must
+    round-trip through the settings modal instead of blocking save."""
+    from tui_client.settings import UserSettings
+
+    monkeypatch.setattr("tui_client.screens.settings.save_settings", lambda *a, **k: None)
+    user = UserSettings()
+    user.watchlist.watchlists = {"default": []}
+    app = AlertsApp(api=FakeApi(), user=user)
+    async with app.run_test() as pilot:
+        await pilot.press("o")
+        assert await wait_until(pilot, lambda: isinstance(app.screen, SettingsModal))
+        app.screen.query_one("#save", Button).press()
+        assert await wait_until(pilot, lambda: not isinstance(app.screen, SettingsModal))
+        assert app.user.watchlist.watchlists == {"default": []}

@@ -136,8 +136,10 @@ class SettingsModal(ModalScreen[UserSettings | None]):
             name, symbols_raw = chunk.split(":", 1)
             name = name.strip()
             symbols = [s.strip().upper() for s in symbols_raw.split(",") if s.strip()]
-            if not name or not symbols:
-                raise ValueError(f"Watchlist entry '{chunk}' needs a name and symbols")
+            # Empty symbol lists are valid (the app creates `default: []` when the
+            # last watchlist is deleted); only a name is required here.
+            if not name:
+                raise ValueError(f"Watchlist entry '{chunk}' needs a name")
             if name in watchlists:
                 raise ValueError(f"Duplicate watchlist name '{name}'")
             watchlists[name] = symbols
