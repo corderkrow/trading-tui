@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
@@ -154,6 +155,13 @@ class PriceInput(Input):
     ]
 
     tick = 0.01
+    # Cleared on first focus so the user can type instead of deleting "0.00".
+    _clear_on_focus = True
+
+    def on_focus(self, event: events.Focus) -> None:
+        if self._clear_on_focus:
+            self._clear_on_focus = False
+            self.value = ""
 
     def action_step(self, factor: int) -> None:
         try:
@@ -337,7 +345,7 @@ class CreateAlertModal(ModalScreen[AlertSpec | None]):
 
     def compose(self) -> ComposeResult:
         symbol_input = Input(
-            self.default_symbol, id="symbol", restrict=r"[A-Za-z0-9.\-]*"
+            self.default_symbol, id="symbol", restrict=r"[A-Za-z0-9.\-_^=/]*"
         )
         with Vertical(id="dialog"):
             with Horizontal(id="header"):
@@ -415,7 +423,7 @@ class CreateAlertModal(ModalScreen[AlertSpec | None]):
             )
         self._sync_message()
         self._sync_notifications()
-        row.value.focus()
+        self.query_one("#symbol", Input).focus()
 
     # ── state sync ──────────────────────────────────────────
 

@@ -257,9 +257,11 @@ class ConditionEditorScreen(ModalScreen[Condition | None]):
                 )
 
     def on_mount(self) -> None:
+        value_input = self.query_one("#value", PriceInput)
         if self._condition is not None and self._condition.value is not None:
-            self.query_one("#value", PriceInput).value = f"{self._condition.value:,.2f}"
-        self.query_one("#value", PriceInput).focus()
+            value_input.value = f"{self._condition.value:,.2f}"
+            value_input._clear_on_focus = False
+        value_input.focus()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "value_type":
@@ -345,7 +347,9 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         self._inline_id = uuid4().hex[:8]
         self._inline_timeframe = DEFAULT_TIMEFRAME
         self._message = initial.message if initial else ""
-        self._message_dirty = initial is not None
+        self._message_dirty = initial is not None and not self._is_placeholder_message(
+            initial
+        )
         self._notifications = (
             list(initial.notifications) if initial else list(DEFAULT_NOTIFICATIONS)
         )
@@ -359,9 +363,38 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
     def editing(self) -> bool:
         return self._initial is not None
 
+    @staticmethod
+    def _generated_message(symbol: str, conditions: list[Condition]) -> str:
+        previews = [c.preview_short() for c in conditions]
+        return f"{symbol} " + " and ".join(previews) if previews else symbol
+
+    @classmethod
+    def _is_placeholder_message(cls, spec: AlertSpec) -> bool:
+        """True when ``spec.message`` is still an auto-generated default.
+
+        A custom message must survive an edit untouched, so it is only replaced
+        when it matches what the dialogs generate. Covers the multi-condition
+        preview here and the ``SYMBOL Operator Value`` line the create dialog
+        writes for its first condition.
+        """
+        text = (spec.message or "").strip()
+        if not text:
+            return True
+        if text == cls._generated_message(spec.symbol, spec.conditions):
+            return True
+        for condition in spec.conditions:
+            prefix = f"{spec.symbol} {condition.operator} "
+            if text.startswith(prefix):
+                try:
+                    float(text[len(prefix) :].replace(",", ""))
+                    return True
+                except ValueError:
+                    continue
+        return False
+
     def compose(self) -> ComposeResult:
         symbol_input = Input(
-            self.default_symbol, id="symbol", restrict=r"[A-Za-z0-9.\-]*"
+            self.default_symbol, id="symbol", restrict=r"[A-Za-z0-9.\-_^=/]*"
         )
         with Vertical(id="dialog"):
             with Horizontal(id="header"):
@@ -445,7 +478,10 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         self._render_mode()
         self._sync_timeframe_hint()
         self._sync_message()
-        self.query_one("#value", PriceInput).focus()
+        if self.editing:
+            self.query_one("#value", PriceInput).focus()
+        else:
+            self.query_one("#symbol", Input).focus()
 
     def _hydrate_initial(self, spec: AlertSpec) -> None:
         self.query_one("#symbol", Input).value = spec.symbol
@@ -503,7 +539,9 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
             condition.value_type if condition.value_type in VALUE_TYPES else "Value"
         )
         if condition.value is not None:
-            self.query_one("#value", PriceInput).value = f"{condition.value:,.2f}"
+            value_input = self.query_one("#value", PriceInput)
+            value_input.value = f"{condition.value:,.2f}"
+            value_input._clear_on_focus = False
 
     def _render_mode(self) -> None:
         multi = self._is_multi()
@@ -548,8 +586,7 @@ class AlertScreen(ModalScreen[AlertSpec | None]):
         if self._message_dirty:
             return
         symbol = self.query_one("#symbol", Input).value.strip() or self.default_symbol
-        previews = [c.preview_short() for c in self._all_conditions()]
-        self._message = f"{symbol} " + " and ".join(previews) if previews else symbol
+        self._message = self._generated_message(symbol, self._all_conditions())
         self.query_one("#message", Button).label = f"{self._message} >"
 
     def _sync_notifications(self) -> None:

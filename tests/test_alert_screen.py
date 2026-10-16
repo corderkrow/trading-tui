@@ -200,6 +200,28 @@ async def test_single_condition_is_list_of_one(alert_app):
     assert len(app.result.conditions) == 1
 
 
+class _FakeSearchApi:
+    async def search_symbols(self, query: str, limit: int = 10):
+        from tui_client.api import SearchHitView
+
+        return [SearchHitView(symbol="^SPX", name="S&P 500 INDEX")]
+
+
+async def test_symbol_autocomplete_accepts_caret_symbol():
+    """A '^' index suggestion must not be silently dropped by the input restrict."""
+    app = AlertHost(default_symbol="BTCUSDT", api=_FakeSearchApi())
+    async with app.run_test(size=(80, 30)) as pilot:
+        assert await wait_until(pilot, lambda: isinstance(app.screen, AlertScreen))
+        symbol = app.screen.query_one("#symbol", Input)
+        symbol.value = "spx"
+        symbol.focus()
+        await app.screen._search_symbols("spx")
+        await pilot.pause()
+        await pilot.press("down")
+        await pilot.press("enter")
+        assert symbol.value == "^SPX"
+
+
 async def test_symbol_change_updates_default_message(alert_app):
     app, pilot = alert_app
     app.screen.query_one("#symbol", Input).value = "ETH-USD"

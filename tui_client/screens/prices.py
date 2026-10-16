@@ -176,7 +176,7 @@ class AddSymbolModal(ModalScreen[tuple[str, str] | None]):
 
     def compose(self) -> ComposeResult:
         symbol_input = Input(
-            placeholder="symbol…", id="wl-symbol", restrict=r"[A-Za-z0-9.\-]*"
+            placeholder="symbol…", id="wl-symbol", restrict=r"[A-Za-z0-9.\-_^=/]*"
         )
         with Vertical(id="modal-body"):
             yield Label(self._title, id="modal-title")
