@@ -20,6 +20,7 @@ from app.services.alerts.domain import (
     TriggerMode,
     now_utc,
 )
+from app.services.symbols import resolve_symbol
 
 
 class ConditionRequest(BaseModel):
@@ -64,7 +65,7 @@ class CreateAlertRequest(BaseModel):
     @field_validator("symbol")
     @classmethod
     def _normalize_symbol(cls, value: str) -> str:
-        symbol = value.strip().upper()
+        symbol = resolve_symbol(value)
         if not symbol:
             raise ValueError("Symbol must not be empty")
         return symbol

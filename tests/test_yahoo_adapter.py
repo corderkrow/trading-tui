@@ -92,6 +92,30 @@ async def test_fetch_tickers_skips_quotes_without_price():
     assert [t.symbol for t in tickers] == ["AAPL"]
 
 
+async def test_fetch_tickers_resolves_us_index_alias():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "fc.yahoo.com" in url:
+            return httpx.Response(
+                200, headers={"set-cookie": "A3=token; Domain=.yahoo.com; Path=/"}
+            )
+        if "getcrumb" in url:
+            return httpx.Response(200, text="crumb-123")
+        assert request.url.params["symbols"] == "^GSPC", request.url.params["symbols"]
+        return httpx.Response(
+            200, json={"quoteResponse": {"result": [_quote("^GSPC", 5000.0)]}}
+        )
+
+    adapter = YahooAdapter()
+    adapter._client = _mock_client(handler)
+    try:
+        tickers = await adapter.fetch_tickers(["spx"])
+    finally:
+        await adapter.close()
+
+    assert [t.symbol for t in tickers] == ["^GSPC"]
+
+
 def test_get_market_adapter_returns_app_adapter():
     app = create_app()
     request = SimpleNamespace(app=app)

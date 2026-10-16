@@ -59,6 +59,13 @@ async def test_list_alerts():
         assert {a["symbol"] for a in resp.json()} == {"ETHUSDT", "BTCUSDT"}
 
 
+async def test_create_alert_resolves_us_index_alias():
+    async with make_client() as client:
+        resp = await client.post("/alerts", json=payload(symbol=" spx "))
+        assert resp.status_code == 201
+        assert resp.json()["symbol"] == "^GSPC"
+
+
 async def test_delete_alert():
     async with make_client() as client:
         created = await client.post("/alerts", json=payload())

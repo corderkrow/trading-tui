@@ -9,6 +9,7 @@ import httpx
 from app.models.candle import CandleOHLCV
 from app.models.ticker import NewsHit, SearchHit, Ticker
 from app.services.adapters.base import MarketDataAdapter
+from app.services.symbols import resolve_symbol
 
 # Yahoo interval mapping
 _INTERVAL_MAP: dict[str, str] = {
@@ -57,6 +58,7 @@ class YahooAdapter(MarketDataAdapter):
         await self._client.aclose()
 
     async def fetch_candles(self, symbol: str, interval: str, limit: int) -> list[CandleOHLCV]:
+        symbol = resolve_symbol(symbol)
         yahoo_interval = _INTERVAL_MAP.get(interval, interval)
         resp = await self._client.get(
             f"/v8/finance/chart/{symbol}",
@@ -104,12 +106,13 @@ class YahooAdapter(MarketDataAdapter):
         """Batch quote lookup: one request for all symbols, not N sequential ones."""
         if not symbols:
             return []
+        resolved = [resolve_symbol(s) for s in symbols]
         try:
-            return await self._fetch_tickers_batch(symbols)
+            return await self._fetch_tickers_batch(resolved)
         except YahooAuthError:
             # The cookie/crumb service fails independently of quote data; fall
             # back to concurrent per-symbol calls instead of failing the request.
-            return await self._fetch_tickers_concurrent(symbols)
+            return await self._fetch_tickers_concurrent(resolved)
 
     async def _fetch_tickers_batch(self, symbols: list[str]) -> list[Ticker]:
         resp = await self._authed_request(
@@ -197,6 +200,7 @@ class YahooAdapter(MarketDataAdapter):
 
     async def fetch_news(self, symbol: str, limit: int = 10) -> list[NewsHit]:
         """Latest news for the symbol (Yahoo per-symbol RSS headline feed)."""
+        symbol = resolve_symbol(symbol)
         resp = await self._client.get(
             "https://feeds.finance.yahoo.com/rss/2.0/headline",
             params={"s": symbol, "region": "US", "lang": "en-US"},
