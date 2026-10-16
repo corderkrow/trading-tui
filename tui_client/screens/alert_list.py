@@ -10,7 +10,7 @@ from textual.widgets import DataTable, Footer, Static, Tab, Tabs
 
 from tui_client.alerts.models import AlertSpec
 from tui_client.alerts.screens import AlertScreen
-from tui_client.api import AlertApiClient, AlertEventView, AlertView, ApiError
+from tui_client.api import AlertApiClient, AlertEventView, AlertView, ApiError, QuoteView
 from tui_client.screens.prices import (
     ALERT_STATE_LABELS,
     MARKET_TABS,
@@ -19,6 +19,7 @@ from tui_client.screens.prices import (
     alert_state_badge,
     alert_symbol_cell,
     alert_target_cell,
+    change_cell,
 )
 from tui_client.widgets import BannerHeader
 
@@ -45,6 +46,7 @@ class AlertListScreen(Screen[None]):
         self.default_symbol = default_symbol
         self._alerts: list[AlertView] = []
         self._events: list[AlertEventView] = []
+        self._quotes: dict[str, QuoteView] = {}
         self._seen_event_ids: set[str] = set()
         self._primed = False
 
@@ -61,7 +63,9 @@ class AlertListScreen(Screen[None]):
 
     def on_mount(self) -> None:
         table = self.query_one("#alerts-table", DataTable)
-        table.add_columns("Symbol", "Condition", "Target", "Message", "Status", "Expires")
+        table.add_columns(
+            "Symbol", "Price", "Chg %", "Condition", "Target", "Message", "Status", "Expires"
+        )
         table.cursor_type = "row"
         table.focus()
         self.run_worker(self.reload())
@@ -72,15 +76,21 @@ class AlertListScreen(Screen[None]):
     async def reload(self) -> None:
         try:
             self._alerts = await self.api.list_alerts()
+            symbols = list(dict.fromkeys(a.symbol for a in self._alerts))
+            quotes = await self.api.get_quotes(symbols) if symbols else []
         except ApiError as exc:
             self.notify(exc.message, severity="error")
             return
+        self._quotes = {q.symbol: q for q in quotes}
         table = self.query_one("#alerts-table", DataTable)
         table.clear()
         for alert in self._alerts:
             status_label = ALERT_STATE_LABELS.get(alert.status, alert.status.lower())
+            quote = self._quotes.get(alert.symbol)
             table.add_row(
                 alert_symbol_cell(alert.symbol),
+                quote.price_text() if quote is not None else "—",
+                change_cell(quote) if quote is not None else "—",
                 alert_condition_cell(alert.condition_text()),
                 alert_target_cell(alert.target_text()),
                 alert_meta_cell(escape(alert.message) if alert.message else "—"),

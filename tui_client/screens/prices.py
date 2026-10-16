@@ -95,6 +95,15 @@ def alert_meta_cell(text: str) -> str:
     """Message / expiry — muted secondary text."""
     return f"[{MUTED}]{text}[/]"
 
+
+def change_cell(quote: QuoteView) -> str:
+    """24h change — arrow + percent, coloured by direction."""
+    if quote.change_24h is None:
+        return "—"
+    color, arrow = (SUCCESS, "▲") if quote.change_24h >= 0 else (DANGER, "▼")
+    return f"[{color}]{arrow} {quote.change_text()}[/]"
+
+
 CHANGE_FILTERS: dict[str, tuple[str, str | None]] = {
     "f": ("All", None),
     "u": ("%UP", "up"),
@@ -621,7 +630,7 @@ class PricesScreen(Screen[None]):
                 f"[{SYMBOL_COLOR}]{quote.symbol}[/]",
                 quote.name or "—",
                 quote.price_text(),
-                self._change_cell(quote),
+                change_cell(quote),
                 self._ohlc_cell(quote.symbol),
                 quote.volume_text(),
                 quote.market_cap_text(),
@@ -804,13 +813,6 @@ class PricesScreen(Screen[None]):
     def _ohlc_cell(self, symbol: str) -> str:
         candle = self._candles.get(symbol)
         return candle.ohlc_text() if candle is not None else "—"
-
-    @staticmethod
-    def _change_cell(quote: QuoteView) -> str:
-        if quote.change_24h is None:
-            return "—"
-        color, arrow = (SUCCESS, "▲") if quote.change_24h >= 0 else (DANGER, "▼")
-        return f"[{color}]{arrow} {quote.change_text()}[/]"
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Open symbol info (click or Enter) with stats + latest news."""

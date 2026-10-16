@@ -192,8 +192,10 @@ async def test_list_displays_alerts(pilot_app):
     assert await wait_until(pilot, lambda: table_rows(app) == 2)
     table = app.screen.query_one("#alerts-table", DataTable)
     assert plain(table.get_row_at(0)[0]) == "ETHUSDT"
-    assert plain(table.get_row_at(0)[1]) == "Crossing"
-    assert plain(table.get_row_at(1)[4]) == "ACTIVE"
+    assert plain(table.get_row_at(0)[1]) == "$100.00"
+    assert plain(table.get_row_at(0)[2]) == "▲ +1.50%"
+    assert plain(table.get_row_at(0)[3]) == "Crossing"
+    assert plain(table.get_row_at(1)[6]) == "ACTIVE"
 
 
 async def test_list_shows_empty_hint_when_no_alerts():
